@@ -223,6 +223,23 @@ GET $AI_API/v2/lm/scenarios                          (AI-Resource-Group: default
    output.** `_merge` can hand an overlap to a longer span of another type,
    hiding a false positive. This produced a false pass on
    `4 Goods Receipt Close` during the address work.
+
+**Metadata-as-payload — hit three times, so treat it as a class.** Something
+that reads as *outside* the measurement turns out to be *inside* it. The tell
+is always the same: a label, banner or annotation that a human parses as
+commentary and the machine parses as data.
+
+| Instance | What happened |
+|---|---|
+| Annotation prefixes in eval samples | `"DOCUMENTED GAP — ..."` and `"Control — ..."` were written into the `text` field. The scrubber redacted words out of the annotations — `jargon` and `Basis` as `<ORG_NAME>` — corrupting the input and inflating the over-redaction count 3 → 4. Fixed: labels moved to a `note` field the harness never transmits. |
+| The `__version__` line | `getattr(presidio_analyzer, "__version__", "unknown")` printed `presidio unknown` on every run for months. It reads like version evidence; it reported nothing. The docs' `2.2.357` came from pip, not from the line that claimed it. |
+| The `HOLDOUT RESULT` banner | `test_deployed.py` prints that header for **any** input file. Run against `eval_samples_v2.json` it prints `HOLDOUT RECALL: 92.6%` for a set that is explicitly not a holdout. Nothing is wrong with the scorer; the banner is a lie the caller must not repeat. |
+
+**Rule: anything that will be scored, transmitted, or read as a result must be
+kept structurally separate from anything that describes it.** Put commentary in
+a field the pipeline does not consume, and never let a shared harness name the
+thing it is measuring — the caller does that. When quoting a number, quote the
+source file with it.
 8. **Never construct a bare `AnalyzerEngine()`.** Presidio's default resolves to
    `en_core_web_lg` and **downloads it** — an outbound call, forbidden by Rule
    3, and any figure produced that way is measured against the wrong model.
