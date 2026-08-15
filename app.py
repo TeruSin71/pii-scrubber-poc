@@ -84,7 +84,7 @@ LABEL_MAP = {
 }
 
 
-def unmapped_labels(nlp_engine) -> List[str]:
+def unmapped_labels(nlp_engine, labels_to_ignore=None) -> List[str]:
     """Entity labels the NLP layer can emit that LABEL_MAP does not translate.
 
     Such a label falls through _norm's `label.upper()` default, lands
@@ -100,16 +100,25 @@ def unmapped_labels(nlp_engine) -> List[str]:
     spaCy label is either translated to a presidio entity, ignored outright,
     or passed through raw. Only the survivors reach _norm.
 
-    Note the ORG/ORGANIZATION question does not arise here. get_analyzer()
-    un-ignores ORG, but ORG maps to ORGANIZATION and ORGANIZATION is in
-    LABEL_MAP, so the answer is identical with or without that adjustment --
-    which is why this reads the installed default and duplicates no logic.
+    `labels_to_ignore` MUST be the list the engine was actually built with.
+    get_analyzer() un-ignores ORG, and reading presidio's installed default
+    instead happens to give the same answer -- but only because ORG is the
+    ONE label in that default whose presidio entity is in LABEL_MAP.
+    Measured on the pinned stack: of the 11 ignored labels this model can
+    emit, ORG is mapped and the other ten (CARDINAL, EVENT, LANGUAGE, LAW,
+    MONEY, ORDINAL, PERCENT, PRODUCT, QUANTITY, WORK_OF_ART) are not.
+    Un-ignore any of those ten and a default-reading diagnostic reports clean
+    while the pipeline drops spans -- a silent diagnostic, which is the very
+    failure this function exists to prevent. Correct by coincidence is not
+    correct. Defaults to the installed list so the function stays callable
+    standalone in tests.
     """
     try:
         from presidio_analyzer.nlp_engine import NerModelConfiguration
         cfg = NerModelConfiguration()
         mapping = cfg.model_to_presidio_entity_mapping or {}
-        ignored = set(cfg.labels_to_ignore or [])
+        ignored = set(labels_to_ignore if labels_to_ignore is not None
+                      else (cfg.labels_to_ignore or []))
         model_labels = set()
         for nlp in (getattr(nlp_engine, "nlp", None) or {}).values():
             model_labels |= set(nlp.pipe_labels.get("ner", []))
@@ -281,7 +290,14 @@ def get_analyzer():
                 # ignore list from the installed default minus ORG so the fix
                 # is correct on 2.2.357 and a no-op on versions that already
                 # allow it.
-                ner_cfg = None
+                # BOTH initialised here: `keep` is passed to unmapped_labels()
+                # below, and if this try fails it would otherwise be unbound.
+                # A NameError there is caught by the outer handler and becomes
+                # _load_error -- i.e. an optional diagnostic would take the
+                # whole analyzer down. This path must keep degrading the way
+                # it did before item 1: engine builds on presidio defaults,
+                # diagnostic falls back to the installed ignore list.
+                ner_cfg = keep = None
                 try:
                     from presidio_analyzer.nlp_engine import NerModelConfiguration
                     default_ignore = set(NerModelConfiguration().labels_to_ignore or [])
@@ -310,14 +326,35 @@ def get_analyzer():
                 # own evidence -- it makes a silent drop a visible one, so a
                 # future model or spaCy upgrade cannot introduce a leak
                 # without saying so at startup.
-                unmapped = unmapped_labels(nlp_engine)
-                if unmapped:
-                    log.warning(
-                        "LABEL_MAP has no entry for: %s -- spans carrying "
-                        "these labels are DETECTED and then silently dropped, "
-                        "never redacted (trap 8)", ", ".join(unmapped))
-                else:
-                    log.info("LABEL_MAP covers every label the model emits")
+                # `keep` -- the list THIS engine was built with, not the
+                # installed default. See unmapped_labels' docstring: reading
+                # the default is correct only by coincidence.
+                # ADVISORY, AND STRUCTURALLY UNABLE TO BREAK WHAT IT ADVISES
+                # ON. Everything in this block is reporting: it changes no
+                # detection, so no failure inside it may reach the analyzer's
+                # error path. A diagnostic that can take down the thing it
+                # diagnoses has negative value -- it converts a reporting gap
+                # into an outage.
+                #
+                # This is the class fix. The instance was `keep` being unbound
+                # when the NerModelConfiguration adjustment failed; wrapping
+                # here also covers a bad argument, a presidio internal change,
+                # or a failure inside the log call itself. Pinned by
+                # test_label_map.py, which forces unmapped_labels to raise and
+                # asserts detection still works.
+                try:
+                    unmapped = unmapped_labels(nlp_engine, labels_to_ignore=keep)
+                    if unmapped:
+                        log.warning(
+                            "LABEL_MAP has no entry for: %s -- spans carrying "
+                            "these labels are DETECTED and then silently "
+                            "dropped, never redacted (trap 8)",
+                            ", ".join(unmapped))
+                    else:
+                        log.info("LABEL_MAP covers every label the model emits")
+                except Exception as exc:  # noqa: BLE001 -- advisory, never fatal
+                    log.warning("unmapped-label diagnostic failed: %s -- "
+                                "detection is unaffected", exc)
 
                 # BOUNDARY GUARD: Presidio's UrlRecognizer pulls the public
                 # suffix list from publicsuffix.org at runtime -- an outbound

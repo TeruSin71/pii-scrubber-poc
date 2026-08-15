@@ -196,6 +196,18 @@ was caught but typed `ORG_NAME` — redacted, mistyped, log only.
   protects. Governance decision, not an engineering shortcut.
 - **`holdout_samples.json` is gitignored on purpose.** A holdout anyone can read
   while tuning is not a holdout. Same for the two HTML reports.
+- **Advisory code must be unable to break the pipeline it advises on.** A
+  diagnostic that can take down the thing it diagnoses has **negative value**:
+  it converts a reporting gap into an outage. Any block that only reports —
+  logging, counting, labelling, version stamping — is wrapped so no exception
+  from it can reach the path it observes. Established at 1.2.3 Task 1, where
+  wiring the engine's real ignore list into `unmapped_labels()` made a failure
+  in an *optional* configuration step raise straight out of `get_analyzer()`.
+  Before that change the same failure degraded gracefully. **Note the shape:
+  the bug was in the error path of an optional feature, not in the feature** —
+  the feature worked; what broke was what happened when its input did not
+  exist. Pinned by a test that forces the diagnostic to raise and asserts
+  detection still works.
 - **A deliberate detection change pre-registers the SPECIFIC values it
   expects to flip — from measurement, before the run.** A pre-registered flip
   is a pass. An **unregistered flip is a stop, including a rise**, exactly as

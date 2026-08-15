@@ -74,6 +74,109 @@ check("labels presidio ignores are not reported",
       f"reported: {found} -- ignored labels never reach _norm")
 
 # ---------------------------------------------------------------------------
+# 1.2.3 item 1. unmapped_labels() must read the ignore list the ENGINE was
+# built with, not presidio's installed default.
+#
+# get_analyzer() un-ignores ORG. Reading the default happens to give the same
+# answer -- but only because ORG is the ONE label in the default ignore list
+# whose presidio entity is in LABEL_MAP. Measured: of the 11 ignored labels
+# the model can emit, ORG is mapped and the other 10 are not. Un-ignore any
+# of those ten and the diagnostic reports clean while the pipeline drops
+# spans -- a silent diagnostic, which is the exact defect this file exists to
+# catch. Correct today by coincidence, not by construction.
+# ---------------------------------------------------------------------------
+print("1.2.3 -- the diagnostic reads the ENGINE's ignore list, not the default")
+
+from presidio_analyzer.nlp_engine import NerModelConfiguration  # noqa: E402
+
+_cfg = NerModelConfiguration()
+_default_ignore = set(_cfg.labels_to_ignore or [])
+_mapping = _cfg.model_to_presidio_entity_mapping or {}
+_model_labels = set()
+for _nlp in (getattr(nlp_engine, "nlp", None) or {}).values():
+    _model_labels |= set(_nlp.pipe_labels.get("ner", []))
+
+# Premises, asserted rather than assumed -- if any is false the behavioural
+# check below would fail for the wrong reason.
+check("MONEY is ignored by presidio's default", "MONEY" in _default_ignore,
+      f"default ignore: {sorted(_default_ignore)}")
+check("MONEY is a label the model can emit", "MONEY" in _model_labels)
+check("MONEY has no LABEL_MAP entry",
+      _mapping.get("MONEY", "MONEY") not in A.LABEL_MAP,
+      f"MONEY -> presidio {_mapping.get('MONEY', 'MONEY')!r}")
+
+# The behaviour: un-ignoring MONEY must make it visible to the diagnostic.
+_un_money = _default_ignore - {"MONEY"}
+check("un-ignoring MONEY makes the diagnostic report it",
+      "MONEY" in A.unmapped_labels(nlp_engine, labels_to_ignore=_un_money),
+      "the diagnostic cannot see the engine's real ignore list")
+
+# The list get_analyzer ACTUALLY uses must still give the shipped answer.
+_keep = _default_ignore - {"ORG", "ORGANIZATION"}
+check("the engine's real ignore list still yields the shipped result",
+      A.unmapped_labels(nlp_engine, labels_to_ignore=_keep) == found,
+      f"real={A.unmapped_labels(nlp_engine, labels_to_ignore=_keep)} default={found}")
+
+# The call site is the point. A function that CAN take the real list, called
+# without it, is the bug with extra steps.
+_src = open("app.py").read()
+check("get_analyzer() passes the engine's ignore list to unmapped_labels()",
+      "unmapped_labels(nlp_engine, labels_to_ignore=keep)" in _src,
+      "call site still uses the default -- the parameter is decorative")
+
+# `keep` is bound INSIDE the try that adjusts NerModelConfiguration. If that
+# try fails, passing `keep` raises NameError, the outer handler turns it into
+# _load_error, and the analyzer never loads -- an optional diagnostic taking
+# down detection entirely. Before item 1 that path degraded gracefully
+# (ner_cfg stayed None, the engine built with presidio defaults). It must
+# still degrade, so `keep` is initialised beside `ner_cfg`.
+check("`keep` is initialised before the try that binds it",
+      "ner_cfg = keep = None" in _src,
+      "keep is only bound inside the try -- a NerModelConfiguration failure "
+      "would raise NameError and take the whole analyzer down")
+
+# ---------------------------------------------------------------------------
+# 1.2.3 -- the class fix, not the instance.
+#
+# The `keep` guard above closes ONE way the diagnostic could take detection
+# down. This closes the category: no exception from unmapped_labels() may
+# reach the analyzer's error path, whatever its cause -- bad argument, a
+# presidio internal change, a failure inside the log call itself.
+#
+# Advisory code must be unable to break the pipeline it advises on. A
+# diagnostic that can take down the thing it diagnoses has negative value:
+# it converts a reporting gap into an outage.
+# ---------------------------------------------------------------------------
+print("1.2.3 -- the diagnostic cannot break the pipeline it advises on")
+
+_orig_fn = A.unmapped_labels
+
+
+def _boom(*_a, **_k):
+    raise RuntimeError("forced diagnostic failure")
+
+
+try:
+    A.unmapped_labels = _boom
+    A._analyzer = None          # force a rebuild through the failing path
+    A._load_error = None
+    _eng = A.get_analyzer()
+    check("analyzer still loads when the diagnostic raises",
+          _eng is not None, f"get_analyzer() returned {_eng!r}")
+    check("no _load_error recorded",
+          A._load_error is None, f"_load_error={A._load_error!r}")
+    check("detection still works after a diagnostic failure",
+          any(s["type"] == "EMAIL"
+              for s in A.detect("Contact k.mueller@corp.internal for the spec.",
+                                "presidio")),
+          "a failed advisory broke real detection")
+finally:
+    A.unmapped_labels = _orig_fn
+    A._analyzer = None
+    A._load_error = None
+    A.get_analyzer()            # restore a clean analyzer for anything below
+
+# ---------------------------------------------------------------------------
 # A warning nobody sees is the defect, restated. Assert it is actually logged
 # at analyzer build, in a fresh process -- the module-level cache means an
 # in-process rebuild would not re-emit it.
