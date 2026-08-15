@@ -93,6 +93,37 @@ check("Zhang not treated as custom object", not A.is_custom_sap_object("Zhang"))
 check("ZHANG not treated as custom object", not A.is_custom_sap_object("ZHANG"))
 
 # --------------------------------------------------------------------------
+# Defect 4: unsuffixed ORG must be detectable on the PINNED presidio
+#
+# presidio 2.2.357 ships ORG and ORGANIZATION inside
+# NerModelConfiguration.labels_to_ignore, so spaCy's ORG entity is discarded
+# at the NLP-engine layer before any recognizer runs. company_suffix_recognizer
+# needs a legal suffix, so a bare "Pacific Traders" became undetectable --
+# recall 97.8. This test pins the un-ignore fix and is version-portable.
+# --------------------------------------------------------------------------
+print("Defect 4 -- unsuffixed ORG detected on pinned presidio")
+
+t_org = "Requested by Sione Tuilagi from Pacific Traders, phone 09 445 2210."
+org_spans = [s for s in A.detect(t_org, "presidio") if s["type"] == "ORG_NAME"]
+check("unsuffixed 'Pacific Traders' detected as ORG_NAME",
+      any("Pacific Traders" in s["text"] for s in org_spans),
+      f"ORG spans: {[s['text'] for s in org_spans]}")
+
+t_suf = "Vendor Northwind Supplies GmbH raised it."
+check("suffixed org still detected",
+      any(s["type"] == "ORG_NAME" for s in A.detect(t_suf, "presidio")))
+
+try:
+    from presidio_analyzer.nlp_engine import NerModelConfiguration
+    import presidio_analyzer
+    ver = getattr(presidio_analyzer, "__version__", "unknown")
+    still_ignored = set(NerModelConfiguration().labels_to_ignore or [])
+    print(f"  (presidio {ver}; library default still ignores ORG: "
+          f"{'ORG' in still_ignored} -- overridden at runtime)")
+except Exception:
+    pass
+
+# --------------------------------------------------------------------------
 # Invariant: ground-truth recall unchanged at 100%
 # --------------------------------------------------------------------------
 print("Invariant -- selftest recall")

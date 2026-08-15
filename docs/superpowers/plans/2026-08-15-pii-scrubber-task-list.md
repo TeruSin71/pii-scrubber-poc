@@ -37,7 +37,7 @@ These gate Tasks 4–6 only. **Tasks 0 through 3 can run start to finish without
 
 ---
 
-## Task 0 — Environment remediation · ☐ · ~30 min · local only
+## Task 0 — Environment remediation · ✅ · ~30 min · local only
 
 Fixes the two hard blockers. Nothing here touches a remote.
 
@@ -53,7 +53,15 @@ Fixes the two hard blockers. Nothing here touches a remote.
 
 ---
 
-## Task 1 — Local verification · ☐ · ~45 min · local only
+## Task 1 — Local verification · ✅ · ~45 min · local only
+
+> **Stopped 2026-08-15 at `recall_pct 97.8`, then cleared the same day.** The stop was
+> correct: the miss (`Pacific Traders` / `ORG_NAME` / `TKT-0005`) was real and the
+> documented baseline was measured on `presidio-analyzer 2.2.364`, not the pinned
+> `2.2.357`. Fixed at source in `get_analyzer()` (`FIX-GATE1-ORG.md`) — see finding 5.
+> **Re-verified on the pinned stack:** `recall_pct 100.0` · `45/45` · `missed 0` ·
+> `over_detections 6` · `test_fixes.py` **17/17**. No threshold, recognizer,
+> `REDACT_TYPES`, `samples.json` or guard-list was touched — diff confirmed.
 
 Re-baselines the changed `app.py`. This is a **measurement**, not a confirmation.
 
@@ -68,8 +76,8 @@ Re-baselines the changed `app.py`. This is a **measurement**, not a confirmation
 - [ ] 1.7 Spot-check `batch` and `live` scrub modes
 - [ ] 1.8 Stop service; `git status --short` must be empty
 
-**Assert (Rule 2):** `recall_pct 100.0` · `expected_pii 45` · `redacted 45` · `missed 0`
-**Confirm:** `over_detections 6` — re-verified on current code by the fix drop's author (`FIXES-2026-08-15.md`); Task 1 confirms it on this machine.
+**Assert (Rule 2):** `recall_pct 100.0` · `expected_pii 45` · `redacted 45` · `missed 0` — ✅ **met 2026-08-15 on the pinned stack, post-ORG-fix.**
+**Confirm:** `over_detections 6` — ✅ **confirmed 6 on this machine.** `redacting_spans_emitted 51`. Note the pre-fix run measured 4; the two missing detections were ORG-labelled false positives, restored by the same fix. Also confirmed: `test_fixes.py` **17/17**, `Allowlist loaded: 27 tokens` (correct — the seed literal holds 27; `28` was a doc error, corrected across `Dockerfile`, `FIXES-2026-08-15.md` and this plan).
 
 **If recall < 100.0:** report `misses[]` verbatim and **stop**. Do not tune. Name one hypothesis: patch-version drift, or the new rule suppressing a legitimate span.
 
@@ -109,9 +117,10 @@ The Dockerfile now reads `COPY app.py recognizers.py samples.json allowlist.txt 
 - [ ] 3.3 Run container on :8081, confirm `/health`
 - [ ] 3.4 Capture `/info` — expect `engine presidio`, `last_load_error null`, 10 redact types
 - [ ] 3.5 **Confirm `Allowlist loaded: <N> tokens`** — the seed-fallback line means a stale image; stop
+- [ ] 3.5b **Confirm `en_core_web_lg` absent from the image** — `docker exec pii-test python -c "import spacy; print(spacy.util.get_installed_models())"` must return exactly `['en_core_web_sm']`. Dual purpose: 400 MB bloat check, and evidence no bare-default Presidio path (which downloads `lg`) is baked in. Present = stop. See finding 4.
 - [ ] 3.6 In-container `/v1/selftest` → `/tmp/selftest-container.json`
 - [ ] 3.7 Diff vs the correct local reference (allowlist run if it exists, else Task 1)
-- [ ] 3.8 **Network-severed scrub** — disconnect bridge, scrub must still succeed
+- [ ] 3.8 **Network-severed scrub** — disconnect bridge, scrub must still succeed. **This is the empirical proof of Rule 3.** A hang or timeout is a **hard stop** — no longer `--max-time`, no reconnect-and-retry to show it works. Report the hang plus container logs and stop.
 - [ ] 3.9 `docker rm -f pii-test` (keep the image)
 
 Expected diff: `IDENTICAL` — the image ships the same allowlist the local run used. Any delta is a defect; an `over_detections`-only delta most likely means the image predates the final allowlist (rebuild).
@@ -184,6 +193,12 @@ Stop and report rather than working around any of these:
 1. **Docs stale vs code** — ✅ **CLOSED.** README config table + README-DEPLOY updated at source.
 2. **All-caps USER_ID collision** — ⬇️ **DOWNGRADED.** `detect()` now refuses pure-alpha suppression within ±40 chars of user-context words ("posted by", "user", "author"…); `test_fixes.py` 3a–3b pin it. Residual: a collision token with *no* context word in the window still suppresses — the mandatory review of mined candidates remains the controlling mitigation.
 3. **`ES_SD_REBATE` uncovered** — unchanged. No Z/Y prefix; `TADIR` (Tier 2, optional) is the intended fix if it survives in the over-detections.
+4. **Bare `AnalyzerEngine()` downloads `en_core_web_lg`** — ⚠️ **OPEN, standing session rule.** Presidio's default model resolution fetches `lg` (400 MB) over the network. Found by causing it during Task 1 diagnosis; uninstalled, `['en_core_web_sm']` confirmed restored. **Never construct a bare `AnalyzerEngine()`** — mirror `app.py` (explicit `NlpEngineProvider` on `SPACY_MODEL`) or import `app.get_analyzer()`. Rule 3 hazard, not a style point. Repo audited: only `app.py:209`, which passes `nlp_engine` explicitly. Task 3.5b verifies the image.
+5. **`ORG_NAME` undetectable for suffix-less organisations** — ✅ **FIXED 2026-08-15** (`FIX-GATE1-ORG.md`). `presidio-analyzer==2.2.357` default `labels_to_ignore` contains `ORG`/`ORGANIZATION`, so spaCy's ORG label was dropped at the **NLP-engine layer, before any recognizer ran**; the only other path, `recognizers.py:102`, needs a legal suffix (GmbH/Ltd/…), which `Pacific Traders` lacks. `get_analyzer()` now rebuilds the ignore list from the installed default minus `ORG`/`ORGANIZATION` — reading installed values, so it is a no-op on 2.2.364. **This raises recall by restoring a suppressed detection path; it is the inverse of stop-condition 3, which forbids weakening detection.** Verified here: `100.0` / `45/45` / `over_detections 6`, log line `ORG un-ignored at NLP layer (11 labels still ignored)`. Pinned against regression by `test_fixes.py` Defect 4.
+
+   ⚠️ **One claim in the fix note does not hold on this install.** It states `ORGANIZATION` is absent from `SpacyRecognizer.supported_entities` on 2.2.357 and adds it back. Measured here, `SpacyRecognizer.ENTITIES` already contains `ORGANIZATION`, and the service logs `SpacyRecognizer already supports ORGANIZATION` — that half of the fix is a **no-op**. Harmless (the code reads installed values rather than hardcoding), but the working fix is the `labels_to_ignore` rebuild alone. Do not cite the SpacyRecognizer half as load-bearing.
+
+6. **Root-cause provenance of the documented baseline** — ✅ **RESOLVED.** The `100.0` / `over_detections 6` figures were measured on `presidio-analyzer 2.2.364` (installed unpinned), not the pinned `2.2.357`. Both numbers now reproduce on the pinned stack post-fix, which independently confirms the diagnosis. Lesson worth keeping: install from `requirements.txt`, never unpinned, when producing a number anyone will quote.
 
 ---
 
@@ -194,4 +209,6 @@ Stop and report rather than working around any of these:
 | 2026-08-15 | Pre-flight | — | Repo read, plan written, `app.py` + `ALLOWLIST-EXTRACTION.md` updated, plan rewritten and resequenced |
 | 2026-08-15 | Pre-flight | — | `mine_allowlist.py` added; DD03L dropped; U6 answered (TSTC + DD02L in hand); candidates-merge defect found and mitigated in Task 2.3b |
 | 2026-08-15 | Pre-flight | — | Fix drop applied (`FIXES-2026-08-15.md` + `test_fixes.py`): all 3 findings fixed at source. Task 2.6 resolved as Option A; finding 1 closed, 2 downgraded; Task 1 gains `test_fixes.py` step. Statically verified here; runtime 15/15 pending Task 1 |
-| | | | |
+| 2026-08-15 | Task 0 | 0 ✅ | Repo initialised on `deploy/aicore-poc`, baseline commit `0c15601`. `.gitignore` + `.python-version` created. uv provisioned CPython 3.12.13. Docker re-verified 29.2.1 / 10 CPU / 8.2 GB. Disk 18 GB free — above the 15 GB gate, thin. Approved |
+| 2026-08-15 | Task 1 | 1 ✅ | **Cleared after the ORG fix.** `recall_pct 100.0` · `45/45` · `missed 0` · `over_detections 6` · `redacting_spans_emitted 51` · `test_fixes.py` **17/17** · `Allowlist loaded: 27 tokens`. Log confirms `ORG un-ignored at NLP layer (11 labels still ignored)` and `Removed UrlRecognizer`. `Pacific Traders` redacts end-to-end as `<ORG_NAME>`. Diff audited: only `get_analyzer()` changed; `samples.json`/`requirements.txt`/`recognizers.py`/`allowlist.txt` byte-identical. Seed-count doc error `28→27` corrected in 3 files. Noted: the fix's `SpacyRecognizer` half is a no-op on 2.2.357 |
+| 2026-08-15 | Task 1 | 1 ⛔ | **Stopped — recall regression.** Deps + `en_core_web_sm` 3.8.0 installed clean on 3.12.13. `recall_pct 97.8`, `redacted 44/45`, `missed 1` = `Pacific Traders` (`ORG_NAME`, `TKT-0005`). `over_detections 4`, not the documented 6. `test_fixes.py` FAILED 3/15. Steps 5–7 pass (surname guard holds, `UrlRecognizer` removed, batch/live correct). `Allowlist loaded: 27 tokens` — docs say 28. Root causes → findings 5 and (self-inflicted, reverted) 4. **Nothing tuned; tree clean.** Re-verified after `lg` removal: numbers identical, `/info` reports `spacy_model: en_core_web_sm` |

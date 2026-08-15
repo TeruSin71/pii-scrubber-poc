@@ -202,10 +202,33 @@ def get_analyzer():
                 from presidio_analyzer.nlp_engine import NlpEngineProvider
                 from recognizers import all_sap_recognizers
 
-                provider = NlpEngineProvider(nlp_configuration={
+                # presidio 2.2.357's NerModelConfiguration.labels_to_ignore
+                # contains ORG and ORGANIZATION, so spaCy's ORG entity is
+                # discarded at the NLP-engine layer -- before any recognizer
+                # runs. Effect: an unsuffixed company name ("Pacific Traders")
+                # is undetectable, because company_suffix_recognizer needs a
+                # legal suffix and this was the only other path. Rebuild the
+                # ignore list from the installed default minus ORG so the fix
+                # is correct on 2.2.357 and a no-op on versions that already
+                # allow it.
+                ner_cfg = None
+                try:
+                    from presidio_analyzer.nlp_engine import NerModelConfiguration
+                    default_ignore = set(NerModelConfiguration().labels_to_ignore or [])
+                    keep = sorted(default_ignore - {"ORG", "ORGANIZATION"})
+                    ner_cfg = {"labels_to_ignore": keep}
+                    log.info("ORG un-ignored at NLP layer (%d labels still ignored)",
+                             len(keep))
+                except Exception as exc:
+                    log.warning("Could not adjust NerModelConfiguration: %s", exc)
+
+                nlp_conf = {
                     "nlp_engine_name": "spacy",
                     "models": [{"lang_code": "en", "model_name": SPACY_MODEL}],
-                })
+                }
+                if ner_cfg:
+                    nlp_conf["ner_model_configuration"] = ner_cfg
+                provider = NlpEngineProvider(nlp_configuration=nlp_conf)
                 engine = AnalyzerEngine(nlp_engine=provider.create_engine(),
                                         supported_languages=["en"])
 
@@ -219,6 +242,31 @@ def get_analyzer():
                     log.info("Removed UrlRecognizer (prevents outbound call)")
                 except Exception:
                     pass
+
+                # ORGANIZATION is absent from SpacyRecognizer.supported_entities
+                # in presidio 2.2.357 (present in 2.2.364), so spaCy detects
+                # ('Pacific Traders', 'ORG') and the recognizer silently drops
+                # it -- an unsuffixed company name becomes undetectable. The
+                # ORGANIZATION->ORG label mapping already exists in
+                # CHECK_LABEL_GROUPS; only the entity is missing. Re-register
+                # with it added, reading the current list rather than
+                # hardcoding one, so this is correct on either version.
+                try:
+                    from presidio_analyzer.predefined_recognizers import SpacyRecognizer
+                    current = list(getattr(engine.registry, "recognizers", []))
+                    spacy_rec = next((r for r in current
+                                      if type(r).__name__ == "SpacyRecognizer"), None)
+                    ents = list(getattr(spacy_rec, "supported_entities", []) or [])
+                    if "ORGANIZATION" not in ents:
+                        ents.append("ORGANIZATION")
+                        engine.registry.remove_recognizer("SpacyRecognizer")
+                        engine.registry.add_recognizer(
+                            SpacyRecognizer(supported_entities=ents))
+                        log.info("SpacyRecognizer re-registered with ORGANIZATION")
+                    else:
+                        log.info("SpacyRecognizer already supports ORGANIZATION")
+                except Exception as exc:
+                    log.warning("Could not extend SpacyRecognizer entities: %s", exc)
 
                 # Default PhoneRecognizer is US-centric; re-register with the
                 # regions our tickets actually contain.

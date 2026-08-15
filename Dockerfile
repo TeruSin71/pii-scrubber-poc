@@ -34,7 +34,7 @@ RUN mkdir -p /app/hfcache && \
     echo "WARN: GLiNER prefetch skipped -- image will run in presidio-only mode"
 
 # allowlist.txt MUST ship in the image -- without it ALLOWLIST_PATH resolves
-# to a missing file and the service silently falls back to the 28-token seed,
+# to a missing file and the service silently falls back to the 27-token seed,
 # so extracted TSTC/DD02L tokens exist locally but not in production.
 # (Defect found by the VS Code plan review, 2026-08-15.)
 COPY app.py recognizers.py samples.json allowlist.txt ./

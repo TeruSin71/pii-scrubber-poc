@@ -72,7 +72,7 @@ Every task's requirements implicitly include this section. Copied in force from 
 
 **Ground-truth invariant:** `samples.json` — 13 samples, 45 labelled PII values (verified). Never modified.
 
-**Baseline status:** `recall_pct: 100.0`, `expected_pii: 45`, `redacted: 45`, `missed: 0` are the required values. `over_detections: 6` was **re-verified on the current code by the fix drop's author** (`FIXES-2026-08-15.md`) — no longer a stale leftover, but still confirm it on this machine at Task 1 before treating it as the baseline (Rule 8: numbers come from command output run here).
+**Baseline status — ESTABLISHED on this machine 2026-08-15 (Task 1, post-ORG-fix).** `recall_pct: 100.0`, `expected_pii: 45`, `redacted: 45`, `missed: 0`, `over_detections: 6`, `redacting_spans_emitted: 51`, `test_fixes.py` 17/17, `Allowlist loaded: 27 tokens`. Reference file: `/tmp/selftest-local.json`. Tasks 2, 3 and 6 diff against this. It required the `labels_to_ignore` fix in `get_analyzer()` (open finding 5) — the pre-fix pinned stack scored 97.8 / over_detections 4.
 
 **Reporting cadence:** At each gate, the stated deliverable within the stated word limit, numbers verbatim from command output. On failure: the failing command, the actual error, one best hypothesis. Mid-task silence is fine. Blocked >20 minutes on one error → stop and report.
 
@@ -551,7 +551,25 @@ The Dockerfile ships `allowlist.txt` (resolved at source), so the seed fallback 
 docker logs pii-test 2>&1 | grep -E "Allowlist loaded|No allowlist file"
 ```
 
-Expected: `Allowlist loaded: <N> tokens`, N matching the local run. The line `No allowlist file at /app/allowlist.txt -- using built-in seed (28)` means the image was built from a stale Dockerfile — report and stop.
+Expected: `Allowlist loaded: <N> tokens`, N matching the local run. The line `No allowlist file at /app/allowlist.txt -- using built-in seed (27)` means the image was built from a stale Dockerfile — report and stop. (The seed literal holds **27** tokens, counted; `28` was a doc error repeated across several files and corrected 2026-08-15.)
+
+- [ ] **Step 5b: Confirm `en_core_web_lg` is not in the image — a deliverable**
+
+Two things at once: an image-bloat check (the model is 400 MB) and evidence that no
+bare-default Presidio construction — which resolves to `en_core_web_lg` and
+**downloads it over the network** — is reachable in the built image. See open
+finding 4.
+
+```bash
+docker exec pii-test python -c "import spacy; print(spacy.util.get_installed_models())"
+docker exec pii-test sh -c 'ls /app/../usr/lib/python3*/site-packages 2>/dev/null | grep -i en_core || true'
+docker exec pii-test pip list 2>/dev/null | grep -i en_core
+```
+
+Expected: exactly `['en_core_web_sm']`, and `en_core_web_sm` as the only `en_core_*`
+package. Any `en_core_web_lg` present is a **stop**: it means something in the image
+constructed a default analyzer at build time, which is a Rule 3 finding (build-time
+here, but the same code path would fire at inference time on a cache miss).
 
 - [ ] **Step 6: Run the in-container self-test — the deliverable**
 
@@ -590,7 +608,20 @@ curl -s --max-time 30 localhost:8081/v1/scrub -H 'Content-Type: application/json
 docker network connect bridge pii-test
 ```
 
-Expected: the scrub succeeds with the network down, redacting `<PERSON>`, `<EMAIL>`, `<IP_ADDRESS>`. A hang or timeout is a Rule 3 finding — report and stop.
+Expected: the scrub succeeds with the network down, redacting `<PERSON>`, `<EMAIL>`, `<IP_ADDRESS>`.
+
+**This step is the empirical proof of Rule 3** — the only one in the plan that tests
+the boundary rather than reasoning about it. Everything else (removing
+`UrlRecognizer`, Step 5b's model check) is evidence that a known outbound path was
+closed; this is the test that catches an *unknown* one. Treat it accordingly:
+
+- A **hang or timeout is a hard stop.** Do not retry with a longer `--max-time`, do
+  not reconnect the network and re-run to "confirm it works" — a scrub that needs the
+  network is the exact failure this project exists to prevent. Report the hang, the
+  container logs, and stop.
+- A non-timeout error (connection refused, 500) is also a stop, but distinguish it in
+  the report: that is likely a container-health problem, not necessarily a boundary
+  breach.
 
 - [ ] **Step 9: Tear down the test container**
 
@@ -871,6 +902,64 @@ Documented most-likely cause is memory on the free-tier `starter` plan. In order
 
 **3. `ES_SD_REBATE` — UNCHANGED.** No `Z`/`Y` prefix, so `CUSTOM_OBJ_RE` does not match it and the context backstop is irrelevant to it. If it appears among the remaining over-detections after Task 1, `TADIR` (Tier 2, currently optional) is the intended fix.
 
+**4. Bare `AnalyzerEngine()` auto-downloads `en_core_web_lg` — OPEN, standing session rule.**
+Found 2026-08-15 during Task 1 diagnosis, by causing it: a throwaway
+`AnalyzerEngine()` with no `nlp_engine` argument resolved Presidio's default model and
+pulled `en_core_web_lg` (400 MB) over the network. Uninstalled immediately; verified
+`spacy.util.get_installed_models()` back to `['en_core_web_sm']`.
+
+**The rule, binding for the rest of this project:** never construct a bare
+`AnalyzerEngine()`. Any diagnostic must mirror `app.py`'s construction — an explicit
+`NlpEngineProvider` pinned to `SPACY_MODEL` — either by importing `app.get_analyzer()`
+or by repeating the provider block. This is not a tidiness preference: the default
+path performs an **outbound network call to fetch a model**, which is precisely what
+Rule 3 forbids inside the container.
+
+Audited: the only `AnalyzerEngine(` in the repository is `app.py:209`, which passes an
+explicit `nlp_engine`. No shipped code has this hazard — the exposure was the
+diagnostic, not the product. Task 3 Step 5b verifies the built image stays that way.
+
+**5. `ORG_NAME` had no working detection path for suffix-less organisations — FIXED 2026-08-15.**
+Measured at Task 1: `recall_pct: 97.8`, one miss — `Pacific Traders` (`ORG_NAME`,
+sample `TKT-0005`). Two-part cause, both verified against the pinned stack:
+
+- `presidio-analyzer==2.2.357` ships a default `NerModelConfiguration.labels_to_ignore`
+  containing **`ORG` and `ORGANIZATION`**. spaCy *does* tag `Pacific Traders` as `ORG`,
+  but the NLP engine discards the label before it reaches `app.py`'s
+  `ORG`/`ORGANIZATION` → `ORG_NAME` map, which is therefore dead code on the spaCy path.
+- The only surviving `ORG` source is `recognizers.py:102`
+  (`company_suffix_recognizer`), which requires a legal suffix (GmbH/Ltd/Pty/…).
+  `Pacific Traders` has none.
+
+So the value was **undetectable in that configuration** — not a threshold that could be
+lowered, and not a regression introduced by the 2026-08-15 fix drop.
+
+**The fix** (`FIX-GATE1-ORG.md`, applied to `get_analyzer()` only): rebuild
+`labels_to_ignore` from the installed default minus `ORG`/`ORGANIZATION`. It reads
+installed values rather than hardcoding, so it is correct on 2.2.357 and a no-op on
+2.2.364. **This raises recall by restoring a detection path the library was
+suppressing — the inverse of stop-condition 3**, which exists to prevent *weakening*
+detection to make a test pass. Audited by diff: no threshold, recogniser,
+`REDACT_TYPES`, `CUSTOM_OBJECT_RULE`, `ZY_SURNAME_GUARD` or `samples.json` touched.
+
+Re-verified here on the pinned stack: `recall_pct 100.0` · `45/45` · `missed 0` ·
+`over_detections 6` · `redacting_spans_emitted 51` · `test_fixes.py` **17/17**. New log
+line `ORG un-ignored at NLP layer (11 labels still ignored)`. Pinned against regression
+by `test_fixes.py` Defect 4.
+
+⚠️ **Correction to the fix note.** It claims `ORGANIZATION` is absent from
+`SpacyRecognizer.supported_entities` on 2.2.357 and re-registers the recogniser to add
+it. On this install `SpacyRecognizer.ENTITIES` already contains `ORGANIZATION` and the
+service logs `SpacyRecognizer already supports ORGANIZATION` — that half is a **no-op**.
+Harmless, but the load-bearing change is the `labels_to_ignore` rebuild alone.
+
+**Provenance, now resolved.** `over_detections` came back **4** pre-fix, not the 6 the
+fix drop recorded. Both numbers moving together identified the cause: the documented
+`100.0 / 6` were measured on `presidio-analyzer 2.2.364`, installed unpinned rather
+than from `requirements.txt`. Post-fix both reproduce exactly on the pinned stack.
+**Standing lesson:** any number that will be quoted must come from a
+`requirements.txt` install, never an unpinned one.
+
 ---
 
 ## What NOT to do
@@ -884,6 +973,7 @@ Documented most-likely cause is memory on the free-tier `starter` plan. In order
 - Do not chain tasks without the approval gate output.
 - Do not create BTP resources, raise resource plans, or enable Kyma.
 - Do not run `docker system prune` — unrelated containers are present on this machine.
+- **Do not construct a bare `AnalyzerEngine()`** in a diagnostic, a test, or a scratch script. Presidio's default resolves to `en_core_web_lg` and downloads it — an outbound call, forbidden by Rule 3. Mirror `app.py`: explicit `NlpEngineProvider` pinned to `SPACY_MODEL`, or import `app.get_analyzer()`. See open finding 4.
 - Do not commit `.venv/`, `hfcache/`, image layer artifacts, or the session PAT.
 - Do not put real ticket text, real customer names, or real vendor numbers anywhere in this repo.
 
