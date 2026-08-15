@@ -40,8 +40,12 @@ spec:
         maxReplicas: 1
         containers:
         - name: kserve-container
-          # >>> REPLACE with your pushed image <<<
-          image: "ghcr.io/terusin71/pii-scrubber:1.1.0"
+          # Mutable TAG, not a digest, on purpose: a digest freezes this
+          # template to one build, while the tag lets a corrected image flow
+          # through with no template change. That was load-bearing when the
+          # arm64 image had to be replaced (finding 13).
+          # Rollback tag: 1.1.0 (sha256:070dea2c...f38290).
+          image: "ghcr.io/terusin71/pii-scrubber:1.2.0"
           ports:
             - containerPort: 8080
               protocol: TCP
