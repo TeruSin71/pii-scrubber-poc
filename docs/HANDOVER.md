@@ -53,6 +53,7 @@ identical except it lacks the street-address recognizer.
 |---|---|---|
 | **Holdout** — 40 unseen samples, 111 planted values | **96.4%** (107/111) | The honest production-shaped estimate. These samples were never used for tuning. |
 | Self-test — 13 samples, 45 values | 100.0% (45/45) | A **regression baseline, not a result.** The recognizers were tuned against these 13 samples, so 100% is near-guaranteed. |
+| Verification batch v2 — 65 samples, 68 values | 92.6% (63/68) | **Not comparable to 96.4% and not a substitute for it.** Synthetic, Claude-authored 2026-08-15, deliberately weighted toward documented gaps and the thin types. A lower number here is the design working. `eval_samples_v2.json`, gitignored. |
 
 The self-test's job is to prove that packaging, rebuilding and deploying did not
 degrade detection. It is asserted, not targeted: if `/v1/selftest` returns below
@@ -144,14 +145,37 @@ the spaCy layer. The street-address recognizer correctly declines both; the same
 street-type ambiguity resurfaces in the NLP layer. Fixing the recognizer alone
 does not close this class — it needs the P3 jargon glossary.
 
+**Widened 2026-08-15 by the v2 batch.** The class is not only street-type
+ambiguity, and the mistyping is inconsistent:
+
+```
+"raising it with Basis"  -> <ORG_NAME>
+"routed to Basis"        -> <ADDRESS>      same word, different type
+"Driver could not find"  -> <ORG_NAME>
+"3 Way match"            -> 3 <ORG_NAME> match
+```
+
+`Basis` is an SAP module and `Driver` an ordinary role noun, so the glossary
+needs role and module vocabulary, not just street types. `3 Way match` is the
+clean demonstration that this lives above the recognizers: `test_address.py`
+asserts the ADDRESS recognizer declines it, and `Way` still comes out
+`<ORG_NAME>`.
+
 ### Address coverage limits, accepted deliberately
 
 - **NZ/AU forms only.** German-style `Hauptstrasse 12, 80331 Munich` (name
-  before number) is not matched and relies on incidental locality detection.
+  before number) is not matched by the recognizer and relies on incidental
+  locality detection. ⬇️ **Downgraded 2026-08-15:** the v2 batch put two German
+  forms through end to end — `Hauptstrasse 12, 80331 Munich` and
+  `Industriestrasse 45, 70565 Stuttgart` — and **both were redacted.** The
+  incidental path works. This is a weaker gap than it reads, and it should not
+  be used to justify a recognizer rewrite on its own.
 - **Bare ambiguous-type addresses are missed.** `44 Bellbird Rise` with no
   suburb does not match, because street types that are also ordinary logistics
   words require a trailing comma-locality. That rule is what stops
-  `20 Pallet Rack Row` and `12 Handling Unit Place` being eaten.
+  `20 Pallet Rack Row` and `12 Handling Unit Place` being eaten. Confirmed as
+  the **only** ADDRESS leak in the v2 batch (13/14) — the tradeoff is behaving
+  exactly as designed.
 
 ---
 
@@ -271,6 +295,12 @@ refuses to suppress a pure-alpha token when user-context words ("posted by",
    work; a good template for the remaining backlog items.
 5. `PERSON-CONTEXT-FINDING.md` — why the rule-based person promoter was built
    and then **not shipped**. Read before touching the PERSON class.
+6. `eval_samples_v2.json` — 65-sample synthetic verification batch, gitignored
+   and local only. Scored by the same harness:
+   `SCRUB_URL=http://localhost:8080/v1/scrub python3 test_deployed.py eval_samples_v2.json`.
+   Read its `_provenance` block before quoting anything from it; each
+   gap-targeting sample carries a `note` field explaining what it probes, and
+   that field is never sent to the service.
 
 **Backlog, roughly in value order:**
 
@@ -278,10 +308,10 @@ refuses to suppress a pure-alpha token when user-context words ("posted by",
 |---|---|---|
 | ~~P1~~ | ~~street addresses~~ | ✅ **closed 2026-08-15** — 0/3 → 3/3 |
 | ~~P2~~ | ~~person-context promoter~~ | ⛔ **closed 2026-08-15 as a negative result** — built, measured, reverted. Reaches ~1/3 of the residual PERSON class. `PERSON-CONTEXT-FINDING.md` |
-| P2 | unpadded customer number | `1045567` — `sap_customer_ctx` scores 0.35 against a 0.50 floor. Self-contained; the only remaining leak that rules can close |
-| P3 | SAP jargon glossary | the `<ORG_NAME>` over-redaction class |
-| P3 | `en_core_web_lg` upgrade | scoped as **frame robustness**, not vocabulary — `sm` tags `Mere Tuhoe` in one sentence frame and misses it in another. Owns HO-018 and HO-031 |
-| — | expand the sample set to 50–100 real-shaped samples | **highest value overall** — everything above is measured against 40, where one sample is worth 0.9 points |
+| P2 | unpadded customer number | `1045567`, plus `2298871` and `4471902` from the v2 batch — 3 data points now. `sap_customer_ctx` scores 0.35 against a 0.50 floor. Self-contained; **the only remaining leak class that rules can close** |
+| P3 | SAP jargon glossary | the `<ORG_NAME>` over-redaction class — now known to include module and role nouns (`Basis`, `Driver`), not only street types |
+| P2 | `en_core_web_lg` upgrade | **promoted from P3.** Scoped as **frame robustness**, not vocabulary. v2 evidence: `MBEKI` caught but `FONTAINE` leaked, `Ratana` caught but `Okonkwo` leaked — same class, same shape, opposite results. Owns HO-018, HO-031 and the residual PERSON class |
+| ~~—~~ | ~~expand the sample set to 50–100~~ | ✅ **done 2026-08-15** — `eval_samples_v2.json`, 65 samples / 68 values, 92.6%. Synthetic and Claude-authored, so it supplements the blind holdout rather than replacing it. **Still worth replacing with real anonymised ticket shapes when they exist** |
 | — | GLiNER bake-off | blocked on finding 11 |
 
 Every task ends at an approval gate with a stated deliverable and word limit.

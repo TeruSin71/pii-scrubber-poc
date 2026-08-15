@@ -16,3 +16,10 @@ allowlist-candidates.txt
 holdout_samples.json
 holdout-evaluation-report.html
 scrubber-options-for-management.html
+
+# Synthetic verification batch (2026-08-15). Same reasoning as the holdout:
+# an evaluation set that is visible while tuning stops measuring anything.
+# Provenance and limitations are in the file's own _provenance block --
+# it is Claude-authored, so its number is a verification-batch figure and
+# never the holdout figure.
+eval_samples_v2.json
