@@ -24,3 +24,12 @@ scrubber-options-for-management.html
 # never the holdout figure.
 eval_samples_v2.json
 holdout_v3.json
+
+# Session review documents (2026-08-16). Same reasoning as the evaluation
+# sets: they quote scrubbed output and sample IDs from gitignored holdout
+# files, and a holdout anyone can read while tuning stops being a holdout.
+# The text is elided and the repo is private, so the fragments already in
+# commits d333f23 and earlier are ACCEPTED and history is NOT rewritten --
+# but the standard applied to test_jargon.py (paraphrase, never the sample
+# text) applies here too, and this restores consistency with it.
+REVIEW-*.md

@@ -27,30 +27,42 @@ Two paths through the service:
 
 ---
 
-## 1.2.1 — cut over 2026-08-16, deployed self-test NOT YET CONFIRMED
+## 1.2.1 — shipped, cut over, verified end to end (2026-08-16)
 
 | | |
 |---|---|
-| Deployment | **`d08c99a19640540f`** — created by the user, replaces `db3d9cc5eea296cd`, which no longer exists |
-| Image | ✅ published — `ghcr.io/terusin71/pii-scrubber:1.2.1`, `linux/amd64`, `sha256:5ec0f449…08ef6b39` |
-| ServingTemplate | ✅ points at `:1.2.1` (two-line diff, labels untouched) |
-| Verified **in-container** | `1.2.1 / 100.0 / 45/45 / missed 0 / over_detections 4 / spans 49`, identical to local; three gates exact at 108/111, 65/68, 45/50, leak lists unchanged |
-| Verified **on the deployment** | ⛔ **NOT DONE.** Nobody has yet read `/v1/selftest` off `d08c99a19640540f` |
+| Deployment | ✅ **`d08c99a19640540f`** — replaces `db3d9cc5eea296cd`, which was deleted, not stopped |
+| Image | ✅ `ghcr.io/terusin71/pii-scrubber:1.2.1`, `linux/amd64`, `sha256:5ec0f449…08ef6b39` |
+| ServingTemplate | ✅ points at `:1.2.1`, labels untouched |
+| Verified **in-container** | `1.2.1 / 100.0 / 45/45 / missed 0 / over_detections 4 / spans 49` |
+| Verified **on the deployment** | ✅ `/v1/selftest` echoes `build_version 1.2.1`, `100.0`, `45/45`, missed 0, `over_detections 4` — **identical to the container** |
+| Harness against the deployment | ✅ `108/111`, leak list identical (`ZHANG`, `Young`, `Mere Tuhoe`), controls 1, header stamped `build: 1.2.1` |
 
-⛔ **Do not quote any deployed figure until that last row is closed.** The
-image was verified as an artifact, not as a running deployment. Asserting the
-two are the same without reading the endpoint is precisely the substitution
-`BUILD_VERSION` exists to make impossible. One command closes it:
+**Every deployed number now carries the build that produced it.** That is the
+release, and it is closed.
 
-```bash
-curl -s -H "Authorization: Bearer $TOKEN" -H "AI-Resource-Group: default" \
-  "$AI_API/v2/inference/deployments/d08c99a19640540f/v1/selftest" | head -20
+**What 1.2.1 contains:** `BUILD_VERSION` baked at build time and echoed by
+`/info` and `/v1/selftest`; eight glossary entries (`GL` `FX` `WM` `MDG` `MRP`
+`OSS` `CFO` `Rise`); and `test_deployed.py` stamping both the build and the
+sample set it measured, replacing a banner that announced `HOLDOUT RESULT` for
+any file it was handed.
+
+⚠️ **`/info` is NOT reachable through the AI Core inference gateway.**
+Confirmed on this deployment, not merely predicted:
+
+```
+GET $AI_API/v2/inference/deployments/d08c99a19640540f/info   ->  RBAC: access denied
 ```
 
-Expect `build_version 1.2.1`, `recall_pct 100.0`, `45/45`, `missed 0`,
-`over_detections 4`. Anything else is a stop, and a `build_version` that is
-absent or not `1.2.1` means the pod is running a different image than the
-template names.
+Only `/v1/*` is proxied. Read identity from **`/v1/selftest`**.
+`test_deployed.py` already tries `/info` then falls back; a bare curl must use
+the `/v1/` route. **This is why an identity check that passes locally proves
+nothing about the deployment** — the first implementation read `/info` alone,
+was green on every local run, and would have printed `unreachable` forever in
+production.
+
+Rollback stays cheap: revert the template commit and `:1.2.0` comes back with
+no image work — but read the build-stamp blind spot under **Settled** first.
 
 **What 1.2.1 contains:** `BUILD_VERSION` baked at build time and echoed by
 `/info` and `/v1/selftest`, so every number carries the artifact that produced
@@ -172,6 +184,14 @@ was caught but typed `ORG_NAME` — redacted, mistyped, log only.
   protects. Governance decision, not an engineering shortcut.
 - **`holdout_samples.json` is gitignored on purpose.** A holdout anyone can read
   while tuning is not a holdout. Same for the two HTML reports.
+- **The build stamp detects template-to-pod drift, NOT tag mutation.** Know
+  the difference before relying on it. If the pod is running an image other
+  than the one the template names, `build_version` says so. But a **re-push of
+  `:1.2.1` with the same `--build-arg` stamps identically** — the tag now
+  points at different bytes and every response still reads `1.2.1`. Only the
+  **digest** catches that. `BUILD_VERSION` narrowed the blind spot; it did not
+  close it, and no amount of build-time stamping can, because the stamp is an
+  input to the build rather than a property of the artifact.
 - **ServingTemplate uses a mutable tag, not a digest.** A digest freezes the
   template to one build; the tag lets a corrected image flow through with no
   template change. This was load-bearing when the arm64 image had to be
@@ -476,44 +496,47 @@ refuses to suppress a pure-alpha token when user-context words ("posted by",
    gap-targeting sample carries a `note` field explaining what it probes, and
    that field is never sent to the service.
 
-## Next release — 1.2.1, scoped and evidenced
+## ~~Next release — 1.2.1~~ ✅ SHIPPED 2026-08-16
 
-Both items below were found during 1.2.0 work but land in 1.2.1. Scope stayed
-frozen at two items; these were **not** smuggled in.
+Both items landed and are verified on the deployment. `BUILD_VERSION` is baked
+and echoed by `/info` and `/v1/selftest`; all eight glossary entries shipped
+(`GL` `FX` `WM` `MDG` `MRP` `OSS` `CFO` `Rise`), each traced to a blind-batch
+sample. `Rise` left the PRE-CLEARED list because the blind batch supplied the
+missing incident — clearance and evidence pairing up, which is how that
+protocol was designed to work.
 
-**1. `BUILD_VERSION` in the image, echoed by `/v1/selftest`.** From the
-stale-deployment incident: a script pointed at a deployment that was live but
-not the one just shipped, and reported confident numbers for the wrong
-artifact. Nothing in the response identifies which build answered. Bake a
-version string at build time and return it in the selftest payload, so every
-number carries its artifact. This is item 1 because it makes every other
-measurement auditable.
+Measured effect: no gate moved, and over-redactions on the `holdout_v3`
+controls fell **8 → 1**. `over_detections` on the self-test held at 4.
 
-**2. Eight glossary entries, all observed misfiring on the SHIPPED config.**
-The shipping rule is "observed misfire on the shipped config", and these now
-meet it — unlike `SH` and `ES_SD_REBATE`, which only misfired under `lg` and
-stay out.
+---
 
-| Token | Reason | Evidence |
-|---|---|---|
-| `GL` | module | general ledger, mis-tagged on the blind batch |
-| `FX` | module | foreign exchange |
-| `WM` | module | warehouse management |
-| `MDG` | module | master data governance |
-| `MRP` | module | material requirements planning |
-| `OSS` | module | SAP support portal shorthand |
-| `CFO` | role | role acronym, not a person |
-| `Rise` | process | **mid-sentence**, in "the Rise in failed deliveries" |
+## Next release — 1.2.2, scoped at two items
 
-`Rise` is the interesting one. It was safety-cleared in Appendix A of the
-1.2.0 plan but left unshipped for want of an observed misfire — and the blind
-batch produced exactly that, in a sentence where `Rise` is an ordinary noun
-rather than a street type. **The clearance and the evidence now pair up**,
-which is precisely how that protocol was designed to work: prove it safe when
-you first meet it, ship it when an incident asks for it.
+Both approved 2026-08-16 at the 1.2.1 close-out review. Scope is frozen at
+two; a third is a new plan.
 
-Adding all eight is a data-only change to `glossary.txt`, but it is still a
-rebuild and a stop/create cycle on a 1-pod tenant. Bundle them.
+**1. `@app.get("/v1/info")` on the existing `info()` handler.** One decorator
+line, matching the idiom already in `app.py` where `/health`, `/v1/health` and
+`/` stack on one function. No new handler, no new payload.
+
+The reason is **not** the selftest cost. It is that **identity should be cheap
+enough to check reflexively.** Today, reading the build off a deployment means
+running a 13-sample selftest, because `/info` is not proxied — so nobody checks
+casually, and an identity check people avoid is an identity check that does not
+happen. This makes "which build answered?" a free question.
+
+**2. `LABEL_MAP` unknown-label warning.** Latent defect, deferred twice. An
+entity label with no `LABEL_MAP` entry maps nowhere and never becomes a
+redacting type — no warning, no log line, the value leaks in cleartext. Found
+via `en_core_web_lg`, which types `Harbour Freight` as `FAC` where `sm` types
+it `ORG`. Only reachable through `lg` today, **but any future model or spaCy
+upgrade can introduce new labels and the failure is silent.** A startup-time
+warning listing the model's labels absent from `LABEL_MAP` is a one-liner and
+turns a silent drop into a visible one.
+
+Both are small. Neither changes detection on the shipped config, so the four
+burned gates should read exactly `108/111`, `65/68`, `45/50`, `45/45` — and a
+change in any of them means something unintended moved.
 
 **Backlog, roughly in value order:**
 
@@ -522,9 +545,11 @@ rebuild and a stop/create cycle on a 1-pod tenant. Bundle them.
 | ~~P1~~ | ~~street addresses~~ | ✅ **closed 2026-08-15** — 0/3 → 3/3 |
 | ~~P2~~ | ~~person-context promoter~~ | ⛔ **closed 2026-08-15 as a negative result** — built, measured, reverted. Reaches ~1/3 of the residual PERSON class. `PERSON-CONTEXT-FINDING.md` |
 | ~~P2~~ | ~~unpadded customer number~~ | ✅ **shipped in 1.2.0** — twelve cue-gated lookbehind patterns. Blind batch confirmed the *bound*, not a defect: `5591230` behind `client` and `6620945` behind `ship-to` leak because those cues are outside the frozen list, `ship-to` deliberately so. Widening the list is a live option, and `client` is the strongest candidate |
-| ~~P3~~ | ~~SAP jargon glossary~~ | ✅ **shipped in 1.2.0** — 29 evidence-derived entries. 8 more queued for 1.2.1 above |
+| ~~P3~~ | ~~SAP jargon glossary~~ | ✅ **shipped in 1.2.0** — 29 entries; **8 more shipped in 1.2.1**, total 37 entries / 36 tokens. `Close` `Court` `Terrace` `Drive` stay pre-cleared-but-unshipped until evidence appears |
+| ~~—~~ | ~~`BUILD_VERSION` / artifact identity~~ | ✅ **shipped in 1.2.1** — baked at build time, echoed by `/info` and `/v1/selftest`, printed by `test_deployed.py`. Detects template-to-pod drift, **not** tag mutation — see Settled |
 | ~~P2~~ | ~~`en_core_web_lg` upgrade~~ | ⛔ **CLOSED 2026-08-15, not deferred.** Measured net zero (173/179 either way), two new ORG regressions, 433 MB and 2.2× RSS. The residual class is an engine-level question, not a model-size one — see the finding above |
-| P3 | `LABEL_MAP` unknown-label warning | latent defect: unmapped entity labels are dropped silently and leak. One-liner at startup. Trap 8 |
+| **1.2.2** | `@app.get("/v1/info")` | **approved 2026-08-16, item 1.** `/info` is not proxied by the AI Core gateway, so reading a build today costs a 13-sample selftest. Identity should be cheap enough to check reflexively. One decorator line |
+| **1.2.2** | `LABEL_MAP` unknown-label warning | **approved 2026-08-16, item 2.** Latent defect: unmapped entity labels are dropped silently and leak. One-liner at startup. Trap 8 |
 | ~~—~~ | ~~expand the sample set to 50–100~~ | ✅ **done 2026-08-15** — `eval_samples_v2.json`, 65/68. Synthetic and Claude-authored; now burned as a gate at exactly 65/68 |
 | — | GLiNER bake-off / Local LLM | **the only open route for the residual PERSON class.** Blocked on finding 11. Not a model-size question — the per-token lottery is confirmed on three datasets |
 | — | real anonymised ticket shapes | every evaluation set to date is synthetic. The blind batch removed the *authorship* bias, not the *synthetic* one |

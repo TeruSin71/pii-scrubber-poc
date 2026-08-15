@@ -45,6 +45,13 @@ spec:
           # through with no template change. That was load-bearing when the
           # arm64 image had to be replaced (finding 13).
           # Rollback tag: 1.2.0 (sha256:e8a44575...81ca893).
+          #
+          # Blind spot, named accurately (1.2.1): BUILD_VERSION detects
+          # template-to-pod drift -- a pod running an image the template does
+          # not name -- but NOT tag mutation. Re-pushing :1.2.1 with the same
+          # --build-arg stamps identically while the tag points at different
+          # bytes. Only the digest catches that. The mutable-tag decision
+          # stands; it is a known, bounded gap, not an unknown one.
           image: "ghcr.io/terusin71/pii-scrubber:1.2.1"
           ports:
             - containerPort: 8080
