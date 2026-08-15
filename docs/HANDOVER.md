@@ -129,7 +129,7 @@ reading a claim about `README-DEPLOY.html` anywhere in this file, check
 | HO-001 | PERSON | `ZHANG` | all-caps surname | cue enumeration — **solvable by rules** |
 | HO-018 | PERSON | `Young` | bare surname, sentence-initial | cue-free subject position — **needs POS/dependency parsing** |
 | HO-031 | PERSON | `Mere Tuhoe` | full name spaCy missed | strict adjacency + `sm` frame sensitivity — **needs a window, and the model** |
-| HO-009 | CUSTOMER_NO | `1045567` | keyed without leading zeros | pattern scores 0.35 against a 0.50 floor |
+| HO-009 | CUSTOMER_NO | `1045567` | keyed without leading zeros | **no pattern matches at all** — both require 10 digits, the value has 7 |
 
 **These are three person classes, not one — and only one of the three is a
 rule problem.** A rule-based context promoter was built, measured and
@@ -325,7 +325,7 @@ refuses to suppress a pure-alpha token when user-context words ("posted by",
 |---|---|---|
 | ~~P1~~ | ~~street addresses~~ | ✅ **closed 2026-08-15** — 0/3 → 3/3 |
 | ~~P2~~ | ~~person-context promoter~~ | ⛔ **closed 2026-08-15 as a negative result** — built, measured, reverted. Reaches ~1/3 of the residual PERSON class. `PERSON-CONTEXT-FINDING.md` |
-| P2 | unpadded customer number | `1045567`, plus `2298871` and `4471902` from the v2 batch — 3 data points now. `sap_customer_ctx` scores 0.35 against a 0.50 floor. Self-contained; **the only remaining leak class that rules can close** |
+| P2 | unpadded customer number | `1045567`, plus `2298871` and `4471902` from the v2 batch — 3 data points now. **Not a scoring problem:** `sap_customer_padded` is `\b000\d{7}\b` and `sap_customer_ctx` is `\b\d{10}\b`, both requiring 10 digits, and every unpadded value has 7 — nothing matches, so there is no score to raise. (An earlier note here claimed "0.35 against a 0.50 floor"; that was wrong.) Self-contained; **the only remaining leak class that rules can close** |
 | P3 | SAP jargon glossary | the `<ORG_NAME>` over-redaction class — now known to include module and role nouns (`Basis`, `Driver`), not only street types |
 | P2 | `en_core_web_lg` upgrade | **promoted from P3.** Scoped as **frame robustness**, not vocabulary. v2 evidence: `MBEKI` caught but `FONTAINE` leaked, `Ratana` caught but `Okonkwo` leaked — same class, same shape, opposite results. Owns HO-018, HO-031 and the residual PERSON class |
 | ~~—~~ | ~~expand the sample set to 50–100~~ | ✅ **done 2026-08-15** — `eval_samples_v2.json`, 65 samples / 68 values, 92.6%. Synthetic and Claude-authored, so it supplements the blind holdout rather than replacing it. **Still worth replacing with real anonymised ticket shapes when they exist** |

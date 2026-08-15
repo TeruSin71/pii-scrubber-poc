@@ -200,16 +200,20 @@ margin on paper. Task 5 proves it in a capped container before push.
 
 ## 5. Bundle composition and drop order
 
-Each item is independently revertible **before** Task 5. Drop order if
-anything forces a reduction:
+Each item is independently revertible **before** Task 5.
 
-1. **Item 3 (lg)** drops first — biggest cost, smallest measured benefit
-   (+2 of 15 on a hard slice; +0.9 pts on the holdout). Pure config change,
-   one line.
-2. **Item 2 (glossary)** drops second — it makes the scrubber redact less,
-   which is the direction that can create leaks.
-3. **Item 1 (customer fix)** never drops — it closes the only remaining leak
-   class rules can reach, and it only makes the scrubber redact *more*.
+**This ordering is a risk statement, not a preference.** It ranks the three
+items by which direction they push the scrubber when they are wrong:
+
+1. **Item 3 (lg)** drops first — highest cost (433 MB, RSS 421 → 920 MB) for
+   the smallest measured benefit (+2 of 15 on a hard slice, +0.9 pts on the
+   holdout). One line of config.
+2. **Item 2 (glossary)** drops second — it makes the scrubber redact **less**.
+   A wrong entry creates a leak, and a leak cannot be un-leaked.
+3. **Item 1 (customer fix)** never drops — it makes the scrubber redact
+   **more**, so its failure mode is over-redaction, which costs readability
+   rather than compliance. It **fails safe**, and it closes the only
+   remaining leak class rules can reach.
 
 ---
 
@@ -259,10 +263,33 @@ in the recognizer layer.
 carry its own. This keeps the cue out of the redacted span — the failure
 that forced the person promoter out of the recognizer layer.
 
+**APPROVED 2026-08-15 with three refinements, all binding:**
+
+**(a) Case-sensitive, variants enumerated explicitly.** This project was
+already burned once by Presidio's `IGNORECASE` default — it made the SAP
+user-ID pattern match ordinary words, 249 spans against 45 real values. The
+recognizer therefore sets `global_regex_flags=CASE_SENSITIVE` and spells out
+both cases. The two existing patterns are digit-only, so the flag change
+cannot affect them.
+
+**(b) Cue list FROZEN at six, two cases each — twelve patterns:**
+
+```
+Customer  customer   Account  account   Sold-to  sold-to
+Payer     payer      Bill-to  bill-to   Debtor   debtor
+```
+
+**`ship-to` is deliberately excluded** — in delivery text it cues an address
+far more often than an account number.
+
+**(c) `\d{6,9}`, not `\d{6,10}`.** The 10-digit padded form stays the
+existing pattern's territory. No two patterns own the same string.
+
 ```python
-# Sketch for review, not final code.
-_CUST_CUES = ["customer ", "sold-to ", "sold to ", "payer ", "bill-to ",
-              "ship-to ", "debtor ", "kunnr ", "account "]
+# Shape approved at Gate 0.
+_CUST_CUES = ["Customer ", "customer ", "Account ", "account ",
+              "Sold-to ", "sold-to ", "Payer ", "payer ",
+              "Bill-to ", "bill-to ", "Debtor ", "debtor "]
 patterns += [
     Pattern(name=f"sap_customer_unpadded_{i}",
             regex=rf"(?<={re.escape(c)})\d{{6,9}}\b",
@@ -272,8 +299,12 @@ patterns += [
 ```
 
 Score 0.75 clears the 0.50 `CUSTOMER_NO` floor on its own. **The floor is not
-touched.** Presidio's default `IGNORECASE` makes the cue case-insensitive,
-which is wanted here (`Customer` / `customer`).
+touched.**
+
+**Known accepted cost — do not engineer around it.** `account 400000` will
+redact GL account numbers. That is corpus noise in the safe direction: a
+redacted GL account costs readability, a leaked customer number costs
+compliance. Documented, accepted, not mitigated.
 
 **Steps**
 
@@ -519,6 +550,20 @@ thing that was shaped by it.
 Their role after this bundle is **regression gate only**: pass/fail against
 an exact expected value (109/111, 66/68), never a quotable figure.
 
+**Controls are a second, separate gate.** 109/111 and 66/68 cover *recall*
+only. The glossary legitimately changes over-redaction, and should **improve**
+it — HO-015 and the `<ORG_NAME>` misfires are expected to stop redacting.
+
+| Control movement | Verdict |
+|---|---|
+| Fewer control redactions than before | **Expected.** That is the glossary working. |
+| `<PERSON>` misfires on `Config` and similar still present | **Expected.** Not in scope for this bundle. |
+| **Any control redaction that was not there before** | **STOP.** Same severity as a recall deviation. |
+
+A new control redaction means a change made the scrubber redact something it
+previously left alone, in text that contains no PII. Investigate before
+proceeding, exactly as for a recall miss.
+
 **The quotable number comes from a fresh blind batch authored outside this
 session, which the executor must not see before the run.** Do not author one.
 Do not expand v2 to serve this purpose. Any report from this bundle states
@@ -561,23 +606,34 @@ blank until the blind batch runs.
 
 ---
 
-## 15. Open Questions for User Review
+## 15. Answered at Gate 0 — 2026-08-15. These are now binding.
 
-1. **§3.3 correction** — the customer-number instruction was premised on a
-   misdiagnosis I supplied. Confirm the cue-gated-lookbehind shape is
-   acceptable, or specify a different one.
-2. **Glossary size** — 100–200 was specified. If the safe set lands nearer
-   60 after street-type words are rejected, ship the smaller set or widen
-   the categories?
-3. **`over_detections` after lg** — it will change, and the self-test asserts
-   recall only. Do you want a *new* asserted over-detection number recorded
-   as a baseline, or left as an observed value?
-4. **`en_core_web_sm` in the image** — keep it installed as the D5 fallback
-   (+15 MB) or strip it once lg passes?
-5. **Task 6/7 session split** — same session with a gate between, or a fresh
-   session for the remote-mutating tasks?
-6. **Blind batch timing** — does it run against the deployed 1.2.0, or
-   against a local 1.2.0 before push?
+1. **Item 1 shape** — cue-gated lookbehind at 0.75 **approved**, with the
+   three refinements in Task 1: case-sensitive with variants enumerated, cue
+   list frozen at six words / twelve patterns with `ship-to` excluded, and
+   `\d{6,9}` so the padded form keeps sole ownership of 10-digit strings.
+   The `account 400000` GL collision is an accepted cost, documented and not
+   engineered around.
+2. **Glossary size — ship smaller.** 60 proven entries beat 200 hopeful ones.
+   100–200 was an estimate, **never a target**. Do not widen a category to
+   reach a count. The glossary can grow for free in any later release; a leak
+   it causes cannot be un-leaked.
+3. **`over_detections` after lg — asserted baseline, but earn it.** Run once,
+   inspect **every** over-detection individually, confirm each is
+   safe-but-noisy, then freeze the new number with an itemised list in the
+   commit message. Observed-only values drift; this project runs on asserted
+   invariants.
+4. **Keep `en_core_web_sm` in the image.** +15 MB buys an env-var rollback
+   (`SPACY_MODEL=en_core_web_sm`) with **no rebuild**. That is not only the
+   D5 branch — it is a standing production fallback if pod memory misbehaves
+   later. Cheapest insurance in the bundle.
+5. **Tasks 6 and 7 in the same session, gate before push.** The
+   remote-mutating work is already split: the executor builds and pushes, the
+   human performs every AI Core operation. A fresh session buys nothing but
+   context loss.
+6. **Blind batch runs against the deployed 1.2.0.** The quotable number must
+   measure the artifact actually serving, as 96.4% did. It runs **once** — a
+   blind batch is spent by running it, so it gets no local rehearsal.
 
 ---
 
