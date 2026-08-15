@@ -30,7 +30,7 @@ These gate Tasks 4–6 only. **Tasks 0 through 3 can run start to finish without
 | U1 | Task 4 | GitHub repo URL, or "create it". The URL supplied so far is the PAT settings page, not a repo. |
 | U2 | Task 4 | Registry: Docker Hub (needs separate Docker Hub credentials) or `ghcr.io` (reuses the PAT, but it needs **Packages: write**). **Answered `ghcr.io` 2026-08-15 — but see finding 12: the credential actually present on this machine lacks `write:packages`.** |
 | U3 | Task 4 | Private or public. Private recommended. |
-| U4 | Tasks 4, 6 | Which repo/branch AI Core's Git sync already watches (*AI Launchpad → Administration → Git Repositories*). If it isn't the new repo, Task 5's commit lands in the wrong place. |
+| ~~U4~~ | Tasks 4, 6 | ~~Which repo/branch AI Core's Git sync watches~~ — **ANSWERED 2026-08-15.** Previously only `terusin71/aicore-sandbox` ("teruai"). User onboarded `https://github.com/TeruSin71/pii-scrubber-poc` (status COMPLETED) and created application **`pii-scrubber-app`** — repository `pii-scrubber-poc`, path `.`, revision **`deploy/aicore-poc`**. Scenario `pii-scrubber` is visible under ML Operations → Scenarios, which confirms the sync path works end to end. **Consequence: every push to `deploy/aicore-poc` is now a BTP-affecting action.** |
 | U5 | Task 6 | BTP cockpit work + `$DEPLOYMENT_URL` and bearer token. User drives; agent never holds BTP credentials. |
 | ~~U6~~ | Task 2 | ~~TSTC/DDIC export~~ — **answered 2026-08-15**: `TSTC` and `DD02L` marked "Have it". `DD03L` dropped as impractical; `mine_allowlist.py` replaces it. Hand over the two export files at Task 2. |
 | U7 | Task 2 Step 3b | Is there a corpus of ticket/spec text to mine, and who does the mandatory review pass? The miner proposes real user IDs by construction — review is the only control. |
@@ -189,7 +189,22 @@ Standing authorization granted for this session; per-command sign-off waived. St
 
 ---
 
-## Task 5 — Point ServingTemplate at the image · ☐ · ~30 min · local commit
+## Task 5 — Point ServingTemplate at the image · ✅ · ~30 min · local commit
+
+> **Completed 2026-08-15. Commit `3140875`, deliberately NOT pushed.**
+>
+> One line changed, verified: `1 file changed, 1 insertion(+), 1 deletion(-)`.
+> `docker.io/YOUR_DOCKER_USER/pii-scrubber:1.0.0` → `ghcr.io/terusin71/pii-scrubber:1.0.0`.
+> 12 integrity assertions pass: outer and inner YAML both parse, all three labels intact,
+> placeholder gone, `docker-registry-secret` name, `resourcePlan: starter`, engine default
+> `presidio`, port 8080 and cpu/memory limits all unchanged.
+>
+> **Tag, not digest — on purpose.** The pending amd64 rebuild (finding 13) republishes the
+> same `1.0.0` tag, so this line needs no second edit. Pinning `sha256:c57b92e7…` would
+> have frozen the template to the arm64 image AI Core cannot run.
+>
+> ⛔ **Do not push this commit until finding 13 is fixed.** AI Core now watches this branch,
+> so the push is Task 6 Step 1 and is user-driven.
 
 - [ ] 5.1 Edit `serving_template.yaml:45` — the `image:` value only
 - [ ] 5.2 `git diff --stat` must show **exactly one line changed**
