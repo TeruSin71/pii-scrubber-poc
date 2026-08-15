@@ -1,0 +1,20 @@
+# Keep the build context small. The Dockerfile COPYs an explicit file list, so
+# nothing here ever reached the image -- but without this file the daemon still
+# receives ~860 MB of .venv on every build.
+#
+# Do NOT add: requirements.txt, app.py, recognizers.py, samples.json,
+# allowlist.txt -- the Dockerfile needs all five.
+.venv/
+.git/
+.gitignore
+__pycache__/
+*.pyc
+hfcache/
+docs/
+*.log
+.DS_Store
+.python-version
+
+# Rule 4: mined corpus and unreviewed candidates never enter an image either.
+corpus/
+allowlist-candidates.txt

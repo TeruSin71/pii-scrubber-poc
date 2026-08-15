@@ -615,13 +615,35 @@ the boundary rather than reasoning about it. Everything else (removing
 `UrlRecognizer`, Step 5b's model check) is evidence that a known outbound path was
 closed; this is the test that catches an *unknown* one. Treat it accordingly:
 
-- A **hang or timeout is a hard stop.** Do not retry with a longer `--max-time`, do
-  not reconnect the network and re-run to "confirm it works" — a scrub that needs the
-  network is the exact failure this project exists to prevent. Report the hang, the
-  container logs, and stop.
-- A non-timeout error (connection refused, 500) is also a stop, but distinguish it in
-  the report: that is likely a container-health problem, not necessarily a boundary
-  breach.
+- A **hang or timeout is a hard stop** (`curl` exit **28**). Do not retry with a longer
+  `--max-time`, do not reconnect the network and re-run to "confirm it works" — a scrub
+  that needs the network is the exact failure this project exists to prevent. Report the
+  hang, the container logs, and stop.
+- A non-timeout error is **not** a boundary finding. See the caveat below.
+
+⚠️ **Caveat measured 2026-08-15 — the host-side curl above is confounded.**
+`docker network disconnect bridge` also tears down the **published port mapping**, so
+`localhost:8081` becomes unreachable from the host for reasons unrelated to the
+compliance boundary. Observed: `curl` exit **56** (recv failure), not 28. Exit 7 or 56
+here means *the port mapping went away*, which proves nothing either way.
+
+**Run the in-container form as the actual proof** — it is not confounded, because it
+never crosses the host boundary:
+
+```bash
+docker network disconnect bridge pii-test
+docker inspect -f 'networks: {{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' pii-test   # must print empty
+docker exec pii-test curl -s --max-time 30 localhost:8080/v1/scrub \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"contact Aroha Ngata aroha.ngata@x.co.nz at 172.16.4.8","mode":"batch"}'
+docker network connect bridge pii-test
+docker logs pii-test 2>&1 | grep -iE "publicsuffix|urlopen|Max retries|Temporary failure in name resolution"
+```
+
+Expected: the `inspect` prints an empty network list, the scrub returns
+`contact <PERSON> <EMAIL> at <IP_ADDRESS>` with exit 0, and the log grep finds nothing.
+That combination — no networks attached, detection still correct, no resolver errors —
+is the proof. **Always reconnect the bridge**, including on failure.
 
 - [ ] **Step 9: Tear down the test container**
 
