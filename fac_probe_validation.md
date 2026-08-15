@@ -160,6 +160,23 @@ FACP-08/09 confirm the numbered path is intact and independent of `FAC`.
 
 **Zero FAC fires across all 12 controls, stated affirmatively.**
 
+### ⚠️ VACUITY NOTE — this result is NOT safety evidence
+
+**0-of-12 control fires is uninformative, and must never be cited as safety
+evidence for the future recognizer change.**
+
+`FAC` fired zero times on the controls because `FAC` cannot fire *anywhere*
+through this pipeline — `SpacyRecognizer` does not support the entity, so no
+line of any kind could have produced one. The controls were never exercised.
+A test that cannot fail has measured nothing, and this one could not fail.
+
+The over-redaction risk of promoting `FAC` is therefore **entirely
+unmeasured**. When the recognizer fix is planned, its safety evidence must be
+gathered **against a build where `FAC` is actually registered** — this batch
+re-run on that build, plus correct-layer incidence evidence. Quoting "zero
+control fires" from this record in support of that change would be citing the
+absence of a mechanism as proof the mechanism is safe.
+
 Six controls redact via **other, pre-existing paths** — `Handling Unit Place`,
 `Scanner`, `the Court of enquiry`, `Storage Location Yard`, `Plant Building`,
 `Christchurch`, `North Island`. **None is caused by `FAC` and none is caused by

@@ -452,6 +452,36 @@ GET $AI_API/v2/lm/scenarios                          (AI-Resource-Group: default
    That is a separate item, deliberately not smuggled in here. Asserted by
    `test_label_map.py`.
 
+**True measurement taken at the wrong layer — a class of its own, found
+2026-08-16.** A number can be correct, reproducible, independently confirmed,
+and still describe something the product never sees.
+
+The `FAC` promotion (1.2.3 item 3) was justified by an incidence probe: `FAC`
+spans in the corpora, 4 found by the reviewer, 8 after the executor rescanned.
+Both probes were right. Both used **raw spaCy** — `nlp(text).ents` — and the
+pipeline does not. `SpacyRecognizer.supported_entities` has no `FAC`, so
+presidio emits no result and `analyze()` returns empty. The spans are real in
+spaCy and invisible to the scrubber. Mapping `FAC` in `LABEL_MAP` would have
+changed nothing:
+
+```
+BEFORE  detect(): []
+AFTER FAC->ADDRESS in LABEL_MAP: []
+```
+
+**Independent reproduction did not catch it, because both parties measured the
+same wrong layer.** Agreement is not validity; two people can confirm each
+other's answer to a question the system was never asked. What caught it was
+**container validation against the real call path** (`app.detect()`), which is
+why Q2 required probes to fire in the pinned container rather than the venv.
+
+The tell is a measurement taken with a *library* the product depends on rather
+than through the *entry point* the product actually calls. Whenever evidence
+comes from `nlp(...)`, `spacy.load(...)`, a recognizer constructed by hand, or
+any direct model call, ask which layers sit between it and `scrub()` — and
+measure through those instead. **A leak class can be simultaneously real and
+unreachable by the fix proposed for it.**
+
 **Metadata-as-payload — hit three times, so treat it as a class.** Something
 that reads as *outside* the measurement turns out to be *inside* it. The tell
 is always the same: a label, banner or annotation that a human parses as
