@@ -85,7 +85,15 @@ Re-baselines the changed `app.py`. This is a **measurement**, not a confirmation
 
 ---
 
-## Task 2 — Allowlist + packaging decision · ☐ · ~60 min · local only · **conditional**
+## Task 2 — Allowlist + packaging decision · ✅ · ~60 min · local only · **conditional**
+
+> **Completed 2026-08-15.** Both Tier 1 exports verified against `CHECKSUMS.txt`, field 2
+> extracted only, counts reproduced the source README exactly (147,048 / 111,388 /
+> 257,584 union / 5 short). Final: **257,578 tokens** (5 under 3 chars + 1 non-ASCII
+> dropped), `allowlist.txt` 3.0 MB, pure ASCII. Author cross-check re-run
+> independently: 87 distinct IDs, **0 collisions**. `recall_pct` held at **100.0**;
+> `over_detections` **unchanged at 6** — see finding 7 for why that is expected here.
+> Step 3b (corpus miner) **skipped** — U7 unanswered, no corpus and no named reviewer.
 
 Runs before the build so the result ships in the image. **Step 6 runs regardless of everything else.**
 
@@ -192,7 +200,19 @@ Stop and report rather than working around any of these:
 
 1. **Docs stale vs code** — ✅ **CLOSED.** README config table + README-DEPLOY updated at source.
 2. **All-caps USER_ID collision** — ⬇️ **DOWNGRADED.** `detect()` now refuses pure-alpha suppression within ±40 chars of user-context words ("posted by", "user", "author"…); `test_fixes.py` 3a–3b pin it. Residual: a collision token with *no* context word in the window still suppresses — the mandatory review of mined candidates remains the controlling mitigation.
-3. **`ES_SD_REBATE` uncovered** — unchanged. No Z/Y prefix; `TADIR` (Tier 2, optional) is the intended fix if it survives in the over-detections.
+3. **`ES_SD_REBATE` uncovered** — ✅ **MOOT, closed at Task 2.** The over-detections were enumerated on current code and `ES_SD_REBATE` is **not among them** — it is not over-detected at all, so the concern never materialised. `TADIR` (Tier 2) would not help and is not needed. The actual 6 are listed in finding 7.
+
+7. **The Tier 1 allowlist cannot reduce `over_detections` on this sample set** — ℹ️ **EXPECTED, not a defect.** After loading 257,578 Tier 1 tokens, `over_detections` stayed at **6**. Enumerated, they are: `PO` ×2 (ADDRESS), `Invoice IDoc` (ORG_NAME), `Bill` (PERSON), `IBAN` (ORG_NAME), `Munich` (ADDRESS). **None is an SAP technical token**, so no transaction-code/table-name list can touch them:
+   - `PO` is 2 characters — excluded by assembly rule 2 as too collision-prone, correctly.
+   - `Invoice IDoc` is a two-word span; the allowlist matches single tokens and structurally cannot match it.
+   - `Bill`, `Munich` are spaCy mislabelling ordinary English; `Bill` is genuinely ambiguous (`Bill Johnson` is real PII in TKT-0002), so redacting it is the safe error.
+   - `IBAN` is not in `TSTC`/`DD02L` by nature.
+
+   The allowlist is still load-bearing — it protects transaction codes and table names in *real* corpus text. These 13 synthetic samples simply contain no over-detected SAP token for it to fix. Per the plan, this is reported, **not** worked around by hand-adding entries. Revisit when the sample set expands to 50–100 real-shaped samples.
+
+8. **Export tokens are Latin-1 and one is non-ASCII** — ⚠️ **OPEN, re-read before any re-extraction.** `MC1§` (byte `0xa7`) is the single non-ASCII token in the 257,584-token union. Dropped rather than transcoded: `_load_allowlist()` opens with the default codec and catches only `FileNotFoundError`, and the container sets no `LANG`, so a locale-dependent fallback to ASCII would crash the service at import — in the one environment that matters. A pure-ASCII allowlist loads identically under any locale; the cost is one transaction code.
+
+   **The trap that nearly shipped:** BSD `grep -v '[^ -~]'` did **not** match the byte and the resulting "file is pure ASCII: 0" check reported clean while the token was still present. Verify encoding by byte inspection in Python (`b>127`), never by a `grep` character-class. Caught only because the Step 4 clash check then failed to decode the file.
 4. **Bare `AnalyzerEngine()` downloads `en_core_web_lg`** — ⚠️ **OPEN, standing session rule.** Presidio's default model resolution fetches `lg` (400 MB) over the network. Found by causing it during Task 1 diagnosis; uninstalled, `['en_core_web_sm']` confirmed restored. **Never construct a bare `AnalyzerEngine()`** — mirror `app.py` (explicit `NlpEngineProvider` on `SPACY_MODEL`) or import `app.get_analyzer()`. Rule 3 hazard, not a style point. Repo audited: only `app.py:209`, which passes `nlp_engine` explicitly. Task 3.5b verifies the image.
 5. **`ORG_NAME` undetectable for suffix-less organisations** — ✅ **FIXED 2026-08-15** (`FIX-GATE1-ORG.md`). `presidio-analyzer==2.2.357` default `labels_to_ignore` contains `ORG`/`ORGANIZATION`, so spaCy's ORG label was dropped at the **NLP-engine layer, before any recognizer ran**; the only other path, `recognizers.py:102`, needs a legal suffix (GmbH/Ltd/…), which `Pacific Traders` lacks. `get_analyzer()` now rebuilds the ignore list from the installed default minus `ORG`/`ORGANIZATION` — reading installed values, so it is a no-op on 2.2.364. **This raises recall by restoring a suppressed detection path; it is the inverse of stop-condition 3, which forbids weakening detection.** Verified here: `100.0` / `45/45` / `over_detections 6`, log line `ORG un-ignored at NLP layer (11 labels still ignored)`. Pinned against regression by `test_fixes.py` Defect 4.
 
@@ -210,5 +230,6 @@ Stop and report rather than working around any of these:
 | 2026-08-15 | Pre-flight | — | `mine_allowlist.py` added; DD03L dropped; U6 answered (TSTC + DD02L in hand); candidates-merge defect found and mitigated in Task 2.3b |
 | 2026-08-15 | Pre-flight | — | Fix drop applied (`FIXES-2026-08-15.md` + `test_fixes.py`): all 3 findings fixed at source. Task 2.6 resolved as Option A; finding 1 closed, 2 downgraded; Task 1 gains `test_fixes.py` step. Statically verified here; runtime 15/15 pending Task 1 |
 | 2026-08-15 | Task 0 | 0 ✅ | Repo initialised on `deploy/aicore-poc`, baseline commit `0c15601`. `.gitignore` + `.python-version` created. uv provisioned CPython 3.12.13. Docker re-verified 29.2.1 / 10 CPU / 8.2 GB. Disk 18 GB free — above the 15 GB gate, thin. Approved |
+| 2026-08-15 | Task 2 | 2 ✅ | **Allowlist populated.** Checksums verified. Field 2 only; counts matched the export README exactly. **257,578 tokens** (TSTC 147,042 + DD02L 110,536 after removing 852 overlaps; dropped `BP CD CM FW V` as <3 chars and `MC1§` as non-ASCII). `allowlist.txt` 3.0 MB, pure ASCII, `Allowlist loaded: 257583 tokens` (file + 5 unique seed entries). Author cross-check re-verified: 87 IDs, 0 collisions. Clash check OK — `MARA`/`LIPS` allowlisted, `Mara` not, no ground-truth value allowlisted. `recall_pct 100.0` held; `over_detections` **6 → 6**, enumerated and explained in finding 7; finding 3 closed as moot. Step 3b skipped (U7). `COPY` line verified at `Dockerfile:40`. No corpus or candidates file staged |
 | 2026-08-15 | Task 1 | 1 ✅ | **Cleared after the ORG fix.** `recall_pct 100.0` · `45/45` · `missed 0` · `over_detections 6` · `redacting_spans_emitted 51` · `test_fixes.py` **17/17** · `Allowlist loaded: 27 tokens`. Log confirms `ORG un-ignored at NLP layer (11 labels still ignored)` and `Removed UrlRecognizer`. `Pacific Traders` redacts end-to-end as `<ORG_NAME>`. Diff audited: only `get_analyzer()` changed; `samples.json`/`requirements.txt`/`recognizers.py`/`allowlist.txt` byte-identical. Seed-count doc error `28→27` corrected in 3 files. Noted: the fix's `SpacyRecognizer` half is a no-op on 2.2.357 |
 | 2026-08-15 | Task 1 | 1 ⛔ | **Stopped — recall regression.** Deps + `en_core_web_sm` 3.8.0 installed clean on 3.12.13. `recall_pct 97.8`, `redacted 44/45`, `missed 1` = `Pacific Traders` (`ORG_NAME`, `TKT-0005`). `over_detections 4`, not the documented 6. `test_fixes.py` FAILED 3/15. Steps 5–7 pass (surname guard holds, `UrlRecognizer` removed, batch/live correct). `Allowlist loaded: 27 tokens` — docs say 28. Root causes → findings 5 and (self-inflicted, reverted) 4. **Nothing tuned; tree clean.** Re-verified after `lg` removal: numbers identical, `/info` reports `spacy_model: en_core_web_sm` |
