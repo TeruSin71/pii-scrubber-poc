@@ -42,7 +42,7 @@ spec:
         containers:
         - name: kserve-container
           # >>> REPLACE with your pushed image <<<
-          image: "docker.io/YOUR_DOCKER_USER/pii-scrubber:1.0.0"
+          image: "ghcr.io/terusin71/pii-scrubber:1.0.0"
           ports:
             - containerPort: 8080
               protocol: TCP
