@@ -637,14 +637,38 @@ blank until the blind batch runs.
 
 ---
 
-## Appendix A — Proven-unsafe glossary entries
+## Appendix A — Glossary rejections
 
-*Filled during Task 2. Each row: entry, the address or PII value it broke,
-and the test that caught it. Empty at Gate 0 by design.*
+Filled during Task 2. **No street-type word broke an address** — all six
+passed the safety gate, because addresses are multi-token spans and the
+glossary matches whole spans exactly.
 
-| Entry | Broke | Caught by |
-|---|---|---|
-| *(pending Task 2)* | | |
+### A.1 Street types — safety gate results
+
+| Word | Address tested | Still redacts? | Shipped? |
+|---|---|---|---|
+| `Way` | `8 Harbour Way, Whangarei 0110` | ✅ | **yes** — observed misfire |
+| `Rise` | `14 Sunrise Rise, Papakura, Auckland` | ✅ | no — pre-cleared, no misfire |
+| `Close` | `14 Sunrise Close, Papakura` | ✅ | no — pre-cleared, no misfire |
+| `Court` | `19 Kereru Court, Rotorua` | ✅ | no — pre-cleared, no misfire |
+| `Terrace` | `77 Silver Fern Terrace, Porirua` | ✅ | no — pre-cleared, no misfire |
+| `Drive` | `21 Pohutukawa Drive, Tauranga` | ✅ | no — pre-cleared, no misfire |
+
+Five are safety-cleared but **not shipped**: only `Way` was ever observed
+misfiring, and Gate 0 answer 2 forbids widening a category to reach a count.
+They can be added the moment evidence appears.
+
+### A.2 Rejected on risk, not on test failure
+
+| Entry | Reason |
+|---|---|
+| `Bill` | real given name — a person called Bill would leak |
+| `BRAUN` | surname/table collision; `test_fixes.py` asserts it survives as a span |
+| `Munich`, `Wellington`, `Auckland` | real place names |
+| `Target` | real company name |
+| `OSNO` | unknown provenance; all-caps 4 could be a user ID |
+| `Australian`, `Brazilian`, `European`, `Dutch`, `German`, `EU` | nationalities (NRP) — redaction may be intentional |
+| `Invoice IDoc`, `config knowledge`, `the Christchurch DC`, `FSD ZMM_VENDOR_PORTAL`, `Level 8, 21 Queen Street, Auckland` | multi-token spans — brittle under whole-span matching. The last is a **correct** address detection counted as an over-detection only because the span boundary differed from the planted value. |
 
 ## Appendix B — Quick reference
 

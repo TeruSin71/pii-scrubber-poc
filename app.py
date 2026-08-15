@@ -98,6 +98,14 @@ REDACT_TYPES = {
 # --------------------------------------------------------------------------
 ALLOWLIST_PATH = os.getenv("ALLOWLIST_PATH", str(Path(__file__).parent / "allowlist.txt"))
 
+# Hand-curated SAP jargon, loaded into the SAME set through the SAME loader.
+# It is data, not mechanism -- so it inherits case-sensitive exact match, the
+# +/-40-char user-context backstop, and whole-span matching, instead of
+# reimplementing any of them. A glossary entry may veto a PATTERN, never
+# CONTEXT: "posted by Driver" still redacts. See glossary.txt and
+# test_jargon.py.
+GLOSSARY_PATH = os.getenv("GLOSSARY_PATH", str(Path(__file__).parent / "glossary.txt"))
+
 
 def _load_allowlist() -> set:
     tokens = {
@@ -107,21 +115,24 @@ def _load_allowlist() -> set:
         "VD51N", "OVKK", "SE16N", "SE38", "SM37", "ST22",
         "PR00", "NAST", "IDOC", "IDoc", "GR/IR", "BPA", "CPI", "FSD",
     }
-    try:
-        with open(ALLOWLIST_PATH) as fh:
-            for line in fh:
-                # Strip INLINE comments too, not just full-line ones. The
-                # miner emits "TOKEN   # count=N  detected_as=TYPE"; keeping
-                # only lines that *start* with '#' stored the whole 46-char
-                # string as a token that matches nothing -- a populated-looking
-                # allowlist with zero effect. (Defect found in plan review.)
-                t = line.split("#", 1)[0].strip()
-                if t:
-                    tokens.add(t)
-        log.info("Allowlist loaded: %d tokens", len(tokens))
-    except FileNotFoundError:
-        log.info("No allowlist file at %s -- using built-in seed (%d)",
-                 ALLOWLIST_PATH, len(tokens))
+    for label, path in (("Allowlist", ALLOWLIST_PATH), ("Glossary", GLOSSARY_PATH)):
+        before = len(tokens)
+        try:
+            with open(path) as fh:
+                for line in fh:
+                    # Strip INLINE comments too, not just full-line ones. The
+                    # miner emits "TOKEN   # count=N  detected_as=TYPE"; keeping
+                    # only lines that *start* with '#' stored the whole 46-char
+                    # string as a token that matches nothing -- a populated-looking
+                    # allowlist with zero effect. (Defect found in plan review.)
+                    # The glossary reuses this to carry its one-word reason
+                    # column: "Basis   # module".
+                    t = line.split("#", 1)[0].strip()
+                    if t:
+                        tokens.add(t)
+            log.info("%s loaded: %d tokens (total %d)", label, len(tokens) - before, len(tokens))
+        except FileNotFoundError:
+            log.info("No %s file at %s -- skipped (total %d)", label.lower(), path, len(tokens))
     return tokens
 
 

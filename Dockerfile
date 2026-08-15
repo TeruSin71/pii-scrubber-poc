@@ -37,7 +37,7 @@ RUN mkdir -p /app/hfcache && \
 # to a missing file and the service silently falls back to the 27-token seed,
 # so extracted TSTC/DD02L tokens exist locally but not in production.
 # (Defect found by the VS Code plan review, 2026-08-15.)
-COPY app.py recognizers.py samples.json allowlist.txt ./
+COPY app.py recognizers.py samples.json allowlist.txt glossary.txt ./
 
 # AI Core / KServe may run the container as a non-root UID.
 RUN chmod -R 777 /app
