@@ -112,6 +112,26 @@ if env_lines and copy_lines:
           f"ENV at line {env_i + 1}, last COPY at line {last_copy + 1} -- "
           "an early ENV re-runs pip and the spaCy download on every bump")
 
+# ---------------------------------------------------------------------------
+# The harness must not read identity from /info ALONE. The AI Core inference
+# gateway proxies /v1/* only -- /info returns "RBAC: access denied" there --
+# so an /info-only stamp works on every local run and silently reports
+# "unreachable" on every deployed one. Structural, because reproducing the
+# gateway's RBAC locally is not possible.
+# ---------------------------------------------------------------------------
+print("Harness identity routes -- gateway-reachable, printed")
+
+harness = open("test_deployed.py").read()
+route_line = [l.strip() for l in harness.splitlines()
+              if 'for route in (' in l]
+check("test_deployed.py falls back to a /v1/* identity route",
+      route_line and "/v1/selftest" in route_line[0],
+      f"found: {route_line[0] if route_line else '<no route loop found>'!r} -- "
+      "/info alone is not proxied by the AI Core gateway")
+check("identity fetch is non-fatal (bare except, run continues)",
+      "identity is advisory, never fatal" in harness,
+      "the identity fetch must never abort a measurement run")
+
 print()
 if FAILURES:
     print(f"FAILED: {len(FAILURES)} -> {FAILURES}")

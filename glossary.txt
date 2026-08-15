@@ -13,6 +13,15 @@
 # glossary grows for free in a later release, a leak it causes cannot be
 # un-leaked.
 #
+# COUNT RECONCILIATION (2026-08-16). Two true numbers describe this file and
+# they are not the same number: at 1.2.0 it held 29 ENTRIES but the loader
+# logged "Glossary loaded: 28 tokens". Cause: QMEL is also in allowlist.txt
+# (mined from DD02L), allowlist.txt loads first, so QMEL was already in the
+# set and added nothing. Entries != newly-added tokens whenever a hand-
+# curated word collides with the mined extract. At 1.2.1: 37 entries, 36
+# newly-added tokens, same single QMEL overlap. Quote the loader line for
+# set size and the file for provenance, and never treat one as the other.
+#
 # Format:  TOKEN<tab># reason
 # Reason is one word: module | env | doc | table | process | role | facility
 #                     | dept | shorthand

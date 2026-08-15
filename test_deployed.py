@@ -61,16 +61,33 @@ def main() -> int:
         headers["Authorization"] = f"Bearer {token}"
         headers["AI-Resource-Group"] = "default"
 
-    # Stamp the artifact these numbers came from. Pre-1.2.1 images have no
+    # Stamp the artifact these numbers came from. Pre-1.2.1 images carry no
     # build_version -- say so and carry on rather than aborting, because the
     # 1.2.0 and 1.1.0 rollback images must stay measurable.
-    info_url = url.rsplit("/v1/scrub", 1)[0] + "/info"
-    try:
-        with urllib.request.urlopen(
-                urllib.request.Request(info_url, headers=headers), timeout=30) as r:
-            build = json.load(r).get("build_version") or "unknown (pre-1.2.1 image)"
-    except Exception as e:  # noqa: BLE001 -- identity is advisory, never fatal
-        build = f"unreachable ({type(e).__name__})"
+    #
+    # Two routes, cheapest first. /info is NOT reachable through the AI Core
+    # inference gateway: only /v1/* is proxied, and
+    #   GET $AI_API/v2/inference/deployments/<id>/info
+    # returns "RBAC: access denied". A stamp that reads only /info therefore
+    # works locally and degrades to "unreachable" on every deployed run --
+    # silently, and in exactly the environment the stale-deployment incident
+    # happened in. /v1/selftest carries the same field and IS proxied; it
+    # costs a 13-sample run, which is why it is the fallback, not the first
+    # choice. Break on a successful fetch either way: both routes read the
+    # same constant, so a reachable /info that lacks the key means the image
+    # predates 1.2.1 and running the selftest would learn nothing.
+    base = url.rsplit("/v1/scrub", 1)[0]
+    build = None
+    for route in ("/info", "/v1/selftest"):
+        try:
+            with urllib.request.urlopen(
+                    urllib.request.Request(base + route, headers=headers),
+                    timeout=120) as r:
+                build = json.load(r).get("build_version")
+            break
+        except Exception:  # noqa: BLE001 -- identity is advisory, never fatal
+            continue
+    build = build or "unknown (pre-1.2.1 image, or identity unreachable)"
 
     per_type = defaultdict(lambda: {"expected": 0, "caught": 0})
     leaks = []

@@ -874,8 +874,17 @@ docker logs pii121 2>&1 | grep -E "Allowlist loaded|Glossary loaded|ORG un-ignor
 
 Expected: `1.2.1 100.0 45/45 0 <Task 4 value>`, and the glossary line
 reporting **36** tokens — the loader logs *newly added unique* tokens, which
-is 28 today (the file holds 29 entries; one already exists in the seed set),
-so 28 + 8. A glossary that did not reach the image
+was 28 before this bundle, so 28 + 8.
+
+⚠️ **Corrected 2026-08-16.** An earlier draft of this line said the file's
+29th entry "already exists in the seed set". It does not. The duplicate is
+**`QMEL`, which is in `allowlist.txt`** (mined from DD02L); the allowlist
+loads first, so `QMEL` was already in the set and the glossary added nothing
+for it. Overlap with the 27-token built-in seed is zero. Entries and
+newly-added tokens diverge whenever a hand-curated word collides with the
+mined extract — see the reconciliation block at the top of `glossary.txt`.
+
+A glossary that did not reach the image
 starts the service **clean, with no error** — the loader logs a skip and
 carries on. That log line is the only signal.
 
