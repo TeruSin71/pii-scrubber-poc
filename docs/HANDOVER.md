@@ -27,6 +27,33 @@ Two paths through the service:
 
 ---
 
+## ⏳ 1.2.1 is IN FLIGHT — published, not deployed (2026-08-16)
+
+Read this before the table below, which still describes **1.2.0, the running
+deployment**. Nothing in it is stale yet; 1.2.1 has not cut over.
+
+| | |
+|---|---|
+| Image | ✅ **published** — `ghcr.io/terusin71/pii-scrubber:1.2.1`, `linux/amd64`, `sha256:5ec0f449…08ef6b39` |
+| ServingTemplate | ✅ repointed to `:1.2.1` (two-line diff, labels untouched) |
+| Deployment | ⏳ **still `db3d9cc5eea296cd` running 1.2.0.** The cutover is a human step — delete, confirm gone, create clean (finding 16 order) |
+| Verified | selftest in-container `1.2.1 / 100.0 / 45/45 / missed 0 / over_detections 4 / spans 49`, identical to local; three gates exact at 108/111, 65/68, 45/50 with unchanged leak lists |
+
+**What 1.2.1 contains:** `BUILD_VERSION` baked at build time and echoed by
+`/info` and `/v1/selftest`, so every number carries the artifact that produced
+it; and eight glossary entries (`GL` `FX` `WM` `MDG` `MRP` `OSS` `CFO` `Rise`).
+
+⚠️ **`/info` is NOT reachable through the AI Core inference gateway** — only
+`/v1/*` is proxied, and `GET $AI_API/v2/inference/deployments/<id>/info`
+returns `RBAC: access denied`. Read identity from **`/v1/selftest`** when
+talking to a deployment. `test_deployed.py` already tries `/info` then falls
+back; a bare curl needs the `/v1/` route.
+
+Rollback is unchanged and cheap: the ServingTemplate uses a mutable tag, so
+reverting the template commit puts `:1.2.0` back with no image work.
+
+---
+
 ## Current state — deployed and running
 
 | Area | State |
