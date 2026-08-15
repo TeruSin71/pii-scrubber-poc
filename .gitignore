@@ -9,3 +9,10 @@ __pycache__/
 # unreviewed tokens mined from it. Rule 4: neither belongs in this repo.
 corpus/
 allowlist-candidates.txt
+
+# Holdout evaluation set stays OUT of the repo on purpose. Once it is
+# committed it is visible to every future change, and a holdout that anyone
+# can read while tuning stops being a holdout. Decision 2026-08-15.
+holdout_samples.json
+holdout-evaluation-report.html
+scrubber-options-for-management.html

@@ -41,7 +41,7 @@ spec:
         containers:
         - name: kserve-container
           # >>> REPLACE with your pushed image <<<
-          image: "ghcr.io/terusin71/pii-scrubber:1.0.0"
+          image: "ghcr.io/terusin71/pii-scrubber:1.1.0"
           ports:
             - containerPort: 8080
               protocol: TCP

@@ -120,6 +120,103 @@ def company_suffix_recognizer() -> PatternRecognizer:
     )
 
 
+# Street-type keywords, split by false-positive risk. ORDER MATTERS within each
+# group: the long form must precede its abbreviation ("Street" before "St") or
+# alternation matches the short one first and truncates the span.
+#
+# UNAMBIGUOUS -- these are never a trailing noun in SAP prose, so a bare
+# "<number> <Name> <Type>" is safe on its own.
+_SAFE_TYPE = (
+    r"(?:Street|St|Road|Rd|Avenue|Ave|Drive|Dr|Lane|Ln|Terrace|Tce|"
+    r"Crescent|Cres|Highway|Hwy|Parade|Pde|Boulevard|Blvd|Esplanade|Quay|Grove)"
+)
+
+# AMBIGUOUS -- also ordinary words in logistics/WM text, where
+# "<number> <Capitalised words> <Type>" occurs naturally and is structurally
+# identical to an address. Measured false positives with these matching bare:
+#   '20 Pallet Rack Row'  '4 Goods Receipt Close'  '2 Bin View'
+#   '3 Storage Bin Track' '12 Handling Unit Place'
+# The mandatory-name rule cannot help -- the name slot is genuinely filled.
+# So these require a trailing comma-locality, which SAP prose does not produce.
+# Cost: a bare "12 Sunrise Rise" with no suburb is missed.
+_RISKY_TYPE = (
+    r"(?:Place|Pl|Court|Ct|Close|Circle|Valley|Track|View|Walk|Mall|Rise|Row|Loop|Way)"
+)
+
+# A street-name word: capital, then a LOWERCASE letter, then anything.
+# The mandatory lowercase second character is what keeps all-caps SAP tokens
+# (VBAK, MARA, NAST) out of the name slot while still admitting "McLeod".
+_NAME_WORD = r"[A-Z][a-z][A-Za-z'\-]*"
+
+# Trailing locality: comma-separated capitalised words, then an optional
+# 4-digit NZ postcode. Anchoring each group on a comma is what stops the match
+# running past a sentence boundary -- "…Lane, Nelson. Please confirm" cannot
+# swallow "Please", because a full stop is not a comma.
+_LOCALITY = (
+    rf"(?:,\s*{_NAME_WORD}(?:\s+{_NAME_WORD}){{0,2}})*"
+    r"(?:,?\s{1,2}\d{4}\b)?"
+)
+
+# Same, but at least one comma-locality group is mandatory. This is the whole
+# discriminator for the ambiguous street types.
+_LOCALITY_REQ = (
+    rf"(?:,\s*{_NAME_WORD}(?:\s+{_NAME_WORD}){{0,2}})+"
+    r"(?:,?\s{1,2}\d{4}\b)?"
+)
+
+
+def street_address_recognizer() -> PatternRecognizer:
+    """
+    NZ/AU street addresses: [unit] <number> <Name...> <StreetType> [, locality].
+
+    Deterministic and offline -- no geocoding, no postcode lookup, nothing that
+    reaches the network at inference time (Rule 3).
+
+    Two rules keep SAP prose out, and both are verified in test_address.py
+    against the RAW recognizer rather than post-merge output (a post-merge
+    check gave a false pass during development -- _merge can hand an overlap
+    to a longer span of another type and hide the false positive):
+
+      1. At least one capitalised name word must sit between the number and
+         the street type. "3 Way match" is number + type with nothing between,
+         so it cannot match. This is the most likely false positive in MM text.
+      2. Street types that are also ordinary logistics words additionally
+         require a trailing comma-locality (see _RISKY_TYPE).
+
+    Scope is NZ/AU forms only. German-style "Hauptstrasse 12, 80331 Munich"
+    (name before number, 5-digit postcode) is NOT covered and still relies on
+    incidental locality detection.
+    """
+    unit = (r"(?:(?:Unit|Flat|Apartment|Apt|Level|Suite|Shop|Villa)\s+"
+            r"[0-9]{1,4}[A-Za-z]?,?\s+)?")
+    number = r"[0-9]{1,5}[A-Za-z]?(?:\s?-\s?[0-9]{1,5}[A-Za-z]?)?"
+
+    patterns = [
+        Pattern(
+            name="street_address",
+            regex=rf"\b{unit}{number}\s+(?:{_NAME_WORD}\s+){{1,4}}{_SAFE_TYPE}\b\.?{_LOCALITY}",
+            score=0.8,
+        ),
+        # Ambiguous types: identical shape, but a locality is mandatory.
+        Pattern(
+            name="street_address_ambiguous_type",
+            regex=rf"\b{unit}{number}\s+(?:{_NAME_WORD}\s+){{1,4}}{_RISKY_TYPE}\b{_LOCALITY_REQ}",
+            score=0.8,
+        ),
+        # No street component at all, so it needs its own pattern.
+        Pattern(
+            name="postal_box",
+            regex=rf"\b(?:P\.?O\.?\s?Box|Private\s+Bag)\s+[0-9]{{1,6}}{_LOCALITY}",
+            score=0.8,
+        ),
+    ]
+    return PatternRecognizer(
+        supported_entity="ADDRESS",
+        patterns=patterns,
+        global_regex_flags=CASE_SENSITIVE,
+    )
+
+
 def phone_extension_recognizer() -> PatternRecognizer:
     """Internal extensions ('ext 4471', 'x4471') -- missed by phone libraries."""
     patterns = [
@@ -163,6 +260,7 @@ def all_sap_recognizers():
         sap_document_ref_recognizer(),
         permissive_email_recognizer(),
         company_suffix_recognizer(),
+        street_address_recognizer(),
         phone_extension_recognizer(),
         bank_account_recognizer(),
     ]

@@ -1,0 +1,157 @@
+{
+  "_meta": {
+    "purpose": "Independent verification batch for the ADDRESS recognizer (P1). ALL data is fictional. Written blind to holdout_samples.json, which was not opened while building the recognizer -- the point is to measure coverage of the address CLASS, not of three specific leaked strings.",
+    "composition": "12 samples containing addresses of varied shape; 8 containing SAP jargon and no PII at all, so any redacting span on those is a false positive.",
+    "known_gap": "ADDR-12 is a bare ambiguous-type address with no locality ('44 Bellbird Rise'). Option C requires a trailing comma-locality for ambiguous street types, so this is EXPECTED TO MISS. It is included deliberately to keep the cost of that decision visible and measured rather than assumed away."
+  },
+  "samples": [
+    {
+      "id": "ADDR-01",
+      "source_type": "ticket",
+      "text": "Outbound delivery failed for the order shipping to 27 Puriri Street. Route determination returned no result.",
+      "pii": [
+        {"value": "27 Puriri Street", "type": "ADDRESS"}
+      ]
+    },
+    {
+      "id": "ADDR-02",
+      "source_type": "ticket",
+      "text": "Ship-to party updated to 63 Matai Road, Glenfield, Auckland but the delivery still picks the old address.",
+      "pii": [
+        {"value": "63 Matai Road, Glenfield, Auckland", "type": "ADDRESS"}
+      ]
+    },
+    {
+      "id": "ADDR-03",
+      "source_type": "ticket",
+      "text": "Site survey booked at 118 Kahikatea Drive, Hamilton 3200. Coordinator is Hemi Waititi, hemi.waititi@fieldops.example.",
+      "pii": [
+        {"value": "118 Kahikatea Drive, Hamilton 3200", "type": "ADDRESS"},
+        {"value": "Hemi Waititi", "type": "PERSON"},
+        {"value": "hemi.waititi@fieldops.example", "type": "EMAIL"}
+      ]
+    },
+    {
+      "id": "ADDR-04",
+      "source_type": "ticket",
+      "text": "Unit 12, 4 Rewarewa Avenue, Lower Hutt is the new distribution centre. Storage location config still points at the old plant.",
+      "pii": [
+        {"value": "4 Rewarewa Avenue, Lower Hutt", "type": "ADDRESS"}
+      ]
+    },
+    {
+      "id": "ADDR-05",
+      "source_type": "ticket",
+      "text": "Vendor relocated to 31 Great South Road, Manukau. Purchase org master data needs the new address before the next run.",
+      "pii": [
+        {"value": "31 Great South Road, Manukau", "type": "ADDRESS"}
+      ]
+    },
+    {
+      "id": "ADDR-06",
+      "source_type": "ticket",
+      "text": "Freight contact is at 9 Titoki Cres, Blenheim. Carrier rejected the pickup twice.",
+      "pii": [
+        {"value": "9 Titoki Cres, Blenheim", "type": "ADDRESS"}
+      ]
+    },
+    {
+      "id": "ADDR-07",
+      "source_type": "ticket",
+      "text": "Remittance advice should go to PO Box 3388, Christchurch for customer 0001077341.",
+      "pii": [
+        {"value": "PO Box 3388, Christchurch", "type": "ADDRESS"},
+        {"value": "0001077341", "type": "CUSTOMER_NO"}
+      ]
+    },
+    {
+      "id": "ADDR-08",
+      "source_type": "ticket",
+      "text": "Statements are posted to Private Bag 11222, Palmerston North. Output type is not triggering for that partner function.",
+      "pii": [
+        {"value": "Private Bag 11222, Palmerston North", "type": "ADDRESS"}
+      ]
+    },
+    {
+      "id": "ADDR-09",
+      "source_type": "ticket",
+      "text": "Consignee address on the delivery note reads 22 Fantail Close, Cambridge but the sold-to master shows a different one.",
+      "pii": [
+        {"value": "22 Fantail Close, Cambridge", "type": "ADDRESS"}
+      ]
+    },
+    {
+      "id": "ADDR-10",
+      "source_type": "ticket",
+      "text": "Depot at 7 Anchorage Way, Whangaparaoa 0930 is not maintained as a shipping point.",
+      "pii": [
+        {"value": "7 Anchorage Way, Whangaparaoa 0930", "type": "ADDRESS"}
+      ]
+    },
+    {
+      "id": "ADDR-11",
+      "source_type": "fsd",
+      "text": "Pickup location for the pilot is 16B Ngaio Terrace, Wellington. Author of this spec is Rangi Solomon.",
+      "pii": [
+        {"value": "16B Ngaio Terrace, Wellington", "type": "ADDRESS"},
+        {"value": "Rangi Solomon", "type": "PERSON"}
+      ]
+    },
+    {
+      "id": "ADDR-12",
+      "source_type": "ticket",
+      "text": "Deliver the replacement unit to 44 Bellbird Rise and confirm with the site manager.",
+      "pii": [
+        {"value": "44 Bellbird Rise", "type": "ADDRESS"}
+      ]
+    },
+    {
+      "id": "NEG-01",
+      "source_type": "ticket",
+      "text": "Invoice blocked because the 3 Way match failed on the goods receipt. Tolerance keys look wrong.",
+      "pii": []
+    },
+    {
+      "id": "NEG-02",
+      "source_type": "ticket",
+      "text": "Escalate to the Level 3 support ticket queue and check movement type 601 configuration first.",
+      "pii": []
+    },
+    {
+      "id": "NEG-03",
+      "source_type": "ticket",
+      "text": "No plant 4000 deliveries were created overnight. The background job finished without error.",
+      "pii": []
+    },
+    {
+      "id": "NEG-04",
+      "source_type": "expert",
+      "text": "Close the order once the goods receipt is posted in MIGO, otherwise the commitment stays open.",
+      "pii": []
+    },
+    {
+      "id": "NEG-05",
+      "source_type": "ticket",
+      "text": "There are 40 open transfer orders and 12 Handling Unit Place assignments still pending in the warehouse monitor.",
+      "pii": []
+    },
+    {
+      "id": "NEG-06",
+      "source_type": "ticket",
+      "text": "Scan 20 Pallet Rack Row before picking. The 2 Bin View shows empty although stock exists.",
+      "pii": []
+    },
+    {
+      "id": "NEG-07",
+      "source_type": "ticket",
+      "text": "See Order 4500001234 Line 10. Storage location 0001 is not assigned to the warehouse number.",
+      "pii": []
+    },
+    {
+      "id": "NEG-08",
+      "source_type": "expert",
+      "text": "Configure 2 Invoice Way rules for the plant and book 3 Loading Court slots per wave. The 2 Way match variant is separate.",
+      "pii": []
+    }
+  ]
+}
