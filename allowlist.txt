@@ -1,0 +1,3 @@
+# Technical allowlist - tokens never treated as PII
+# Populate from SAP table TSTC (field TCODE), one per line.
+# Lines starting with # are ignored.

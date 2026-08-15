@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PII Scrubber — AI Core Deployment Runbook</title>
+<style>
+  :root{--bg:#fff;--fg:#1f2328;--muted:#57606a;--line:#d0d7de;--good:#1a7f37;--warn:#9a6700;--warnbg:#fff8e6;--warnbd:#eacb6b;--you:#0969da;--cc:#6f42c1;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);font:15.5px/1.62 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:960px;margin:0 auto;padding:44px 26px 90px;}
+  h1{font-size:26px;margin:0 0 4px;} .sub{color:var(--muted);margin:0 0 22px;}
+  h2{font-size:19px;margin:36px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--line);}
+  h3{font-size:16px;margin:22px 0 6px;}
+  p{margin:11px 0;} ul,ol{margin:10px 0;padding-left:24px;} li{margin:7px 0;}
+  pre{background:#0d1117;color:#e6edf3;padding:14px 16px;border-radius:9px;overflow-x:auto;font-size:12.5px;line-height:1.5;font-family:ui-monospace,Menlo,Consolas,monospace;}
+  code{background:#f1f3f5;padding:1px 6px;border-radius:5px;font-size:13px;font-family:ui-monospace,Menlo,Consolas,monospace;}
+  pre code{background:none;padding:0;color:inherit;font-size:12.5px;}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.5px;}
+  th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top;}
+  th{background:#f6f8fa;font-weight:600;}
+  .tag{font-size:11.5px;font-weight:700;border-radius:20px;padding:2px 9px;white-space:nowrap;}
+  .tag.you{background:#eef4fd;color:var(--you);} .tag.cc{background:#f5f0ff;color:var(--cc);}
+  .warn{background:var(--warnbg);border:1px solid var(--warnbd);border-radius:10px;padding:6px 20px;margin:18px 0;}
+  .warn strong{color:var(--warn);}
+  .ok{background:#eef8f0;border:1px solid #b7e0c0;border-radius:10px;padding:6px 20px;margin:18px 0;}
+  .ok strong{color:var(--good);}
+  .big{font-size:30px;font-weight:800;color:var(--good);}
+  .small{font-size:12.5px;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>PII Scrubber — AI Core Deployment Runbook</h1>
+<p class="sub">POC package for BTP Free Tier. Deploys to SAP AI Core (BYOM) — no Cloud Foundry, no Generative AI Hub.</p>
+
+<div class="ok">
+<p><strong>Already verified before you deploy.</strong> The service was executed against the 13 labelled synthetic SAP samples in this session. Result:</p>
+<p><span class="big">100%</span> &nbsp;recall — 45 / 45 planted PII values redacted, 0 misses, 6 over-detections.</p>
+<p class="small">Presidio + custom SAP recognizers, engine=<code>presidio</code>, no GLiNER yet. Three real defects were found and fixed during that run (see “What testing caught”). You are deploying tested code, not first-draft code.</p>
+</div>
+
+<h2>Files in this package</h2>
+<table>
+<tr><th>File</th><th>Purpose</th></tr>
+<tr><td><code>app.py</code></td><td>FastAPI service — <code>/health</code>, <code>/v1/scrub</code>, KServe predict, <code>/v1/selftest</code></td></tr>
+<tr><td><code>recognizers.py</code></td><td>SAP-specific detectors: customer/vendor numbers, user IDs, permissive email + bank account, company suffixes, extensions</td></tr>
+<tr><td><code>samples.json</code></td><td>13 labelled synthetic SAP samples (ground truth for the self-test)</td></tr>
+<tr><td><code>allowlist.txt</code></td><td>Technical tokens never redacted — <strong>populate from TSTC</strong></td></tr>
+<tr><td><code>Dockerfile</code></td><td>Builds the image with model weights baked in (no runtime downloads)</td></tr>
+<tr><td><code>serving_template.yaml</code></td><td>AI Core ServingTemplate — goes in your onboarded Git repo</td></tr>
+<tr><td><code>requirements.txt</code></td><td>Pinned dependencies</td></tr>
+</table>
+
+<h2>Deployment steps</h2>
+
+<h3>1. Build &amp; push the image <span class="tag you">YOU</span></h3>
+<p>Needs Docker and a registry account (Docker Hub is fine for a POC).</p>
+<pre><code>cd pii-scrubber-poc
+docker build -t YOUR_USER/pii-scrubber:1.0.0 .
+docker push YOUR_USER/pii-scrubber:1.0.0</code></pre>
+<p class="small">Build takes a while — torch + GLiNER weights are baked in. To build a slim Presidio-only image, comment out <code>gliner</code> and <code>torch</code> in <code>requirements.txt</code> and the GLiNER prefetch block in the Dockerfile.</p>
+<p><strong>Test it locally first</strong> — this is the cheapest possible failure:</p>
+<pre><code>docker run -p 8080:8080 YOUR_USER/pii-scrubber:1.0.0
+curl localhost:8080/health
+curl localhost:8080/v1/selftest        # expect recall_pct: 100.0</code></pre>
+
+<h3>2. Docker Registry Secret in AI Core <span class="tag you">YOU</span></h3>
+<p>AI Launchpad → <em>SAP AI Core Administration → Docker Registry Secrets → Add</em>. Name it <code>docker-registry-secret</code> (matches the template).</p>
+<pre><code>{".dockerconfigjson":"{\"auths\":{\"https://index.docker.io\":{\"username\":\"USER\",\"password\":\"TOKEN\"}}}"}</code></pre>
+
+<h3>3. Put the template in your Git repo <span class="tag you">YOU</span></h3>
+<p>Edit <code>serving_template.yaml</code> — replace the <code>image:</code> line with your pushed image. Commit it to the repo already onboarded under <em>Git Repositories</em> (the same mechanism your <code>sd-analytics</code> scenario uses). AI Core syncs roughly every 3 minutes.</p>
+
+<h3>4. Confirm the scenario appears <span class="tag you">YOU</span></h3>
+<p><em>ML Operations → Scenarios</em> — <code>pii-scrubber</code> should show up alongside <code>late-delivery</code> and <code>my-first-scenario</code>.</p>
+
+<h3>5. Configuration → Deployment <span class="tag you">YOU</span></h3>
+<p><em>Configurations → Create</em>: pick scenario <code>pii-scrubber</code>, executable <code>pii-scrubber-serve</code>, set parameter <code>engine = presidio</code>. Then <em>Create Deployment</em> from that configuration. Wait for status <strong>RUNNING</strong>.</p>
+
+<h3>6. Call it <span class="tag you">YOU</span></h3>
+<pre><code># Token
+curl -X POST "$AICORE_AUTH_URL/oauth/token?grant_type=client_credentials" \
+  -u "$CLIENT_ID:$CLIENT_SECRET"
+
+# Self-test — the bake-off, running on BTP
+curl "$DEPLOYMENT_URL/v1/selftest" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "AI-Resource-Group: default"
+
+# Scrub one text
+curl -X POST "$DEPLOYMENT_URL/v1/scrub" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "AI-Resource-Group: default" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"IDoc 51 for customer 0001045567, contact Aroha Ngata aroha.ngata@x.co.nz","mode":"batch"}'</code></pre>
+
+<h3>7. Then turn GLiNER on <span class="tag you">YOU</span></h3>
+<p>Create a second configuration with <code>engine = both</code> and deploy it. Compare <code>/v1/selftest</code> between the two — that is your Presidio-vs-Presidio+GLiNER bake-off, measured on BTP. No rebuild needed.</p>
+
+<h2>What testing caught (before it reached BTP)</h2>
+<p>Three defects the self-test exposed. Each is now fixed and commented in the code — worth knowing because each would have been painful to diagnose inside a deployment:</p>
+<ol>
+  <li><strong>Outbound network call from inside the boundary.</strong> Presidio's <code>UrlRecognizer</code> fetches the public-suffix list from <code>publicsuffix.org</code> at runtime. Removed — a scrubber must not phone out.</li>
+  <li><strong>Case-insensitive regex.</strong> Presidio applies <code>IGNORECASE</code> by default, so the SAP user-ID pattern matched ordinary words ("stuck", "status", "sales"). 249 spans on 45 real values. Fixed with explicit case-sensitive flags.</li>
+  <li><strong>A leak caused by span ranking.</strong> spaCy labels <code>172.16.4.8</code> as <code>DATE_TIME</code> (0.85), which outranked <code>IP_ADDRESS</code> (0.60) — and DATE is not redacted, so the IP passed through in cleartext. Merge order now always prefers a redacting span over a non-redacting one, regardless of confidence.</li>
+</ol>
+
+<div class="warn">
+<p><strong>Honest limits of the 100%.</strong> It is 13 synthetic samples that I wrote — a sanity check, not proof. Two caveats: the sample set is small, and I tuned the recognizers against it, so some over-fitting is likely. Expect lower recall on real ticket text. The number that will matter is the one you get after expanding to 50–100 samples drawn from the shapes your real tickets actually take. <strong>Do not present 100% to management as the expected production figure.</strong></p>
+</div>
+
+<h2>Known over-detections (6 — re-verified 2026-08-15 on current code)</h2>
+<p>All safe-but-noisy — extra redaction, never a leak. Mostly spaCy's small model mislabelling technical phrases ("Invoice IDoc" → ORG, "PO" → ADDRESS). Four ways to reduce them, in order of effort: the <strong>deterministic Z*/Y* custom-object rule</strong> (already implemented, <code>CUSTOM_OBJECT_RULE=true</code>), populate the <strong>allowlist</strong> per <code>ALLOWLIST-EXTRACTION.md</code>, switch <code>SPACY_MODEL</code> to <code>en_core_web_lg</code>, or enable GLiNER (<code>engine=both</code>).</p>
+
+<h2>Free-tier watch-items</h2>
+<ul>
+  <li><strong>Memory.</strong> The <code>starter</code> resource plan is CPU-only and small. Presidio-only fits comfortably; adding GLiNER may not. If the deployment crash-loops, that is why — stay on <code>engine=presidio</code> and raise the plan later.</li>
+  <li><strong>Not for real data.</strong> Free tier has no SLA and is resettable. Synthetic samples only.</li>
+  <li><strong>Cloud Foundry is untouched.</strong> This uses none of your 3.44 GB / 4 GB CF quota.</li>
+</ul>
+
+</div>
+</body>
+</html>

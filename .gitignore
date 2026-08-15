@@ -1,0 +1,11 @@
+.venv/
+hfcache/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+*.log
+# mine_allowlist.py inputs and outputs — may contain real ticket text or
+# unreviewed tokens mined from it. Rule 4: neither belongs in this repo.
+corpus/
+allowlist-candidates.txt

@@ -1,0 +1,143 @@
+{
+  "_meta": {
+    "purpose": "Starter synthetic sample set for the PII Scrubber POC bake-off. ALL data is fictional. Ground-truth PII is labelled so recall/precision can be measured. Expand to ~50-100 for the full run.",
+    "pii_types": ["PERSON", "EMAIL", "PHONE", "ADDRESS", "CUSTOMER_NO", "VENDOR_NO", "ORG_NAME", "USER_ID", "IP_ADDRESS", "IBAN"],
+    "note": "SAP-specific IDs (CUSTOMER_NO, VENDOR_NO, USER_ID) are the categories a general PII model is most likely to miss — watch recall there."
+  },
+  "samples": [
+    {
+      "id": "TKT-0001",
+      "source_type": "ticket",
+      "text": "IDoc stuck in status 51 for sales order to customer 0001045567 (Harbour Freight Ltd). Error: 'ship-to party not found'. Reported by Aroha Ngata, aroha.ngata@harbourfreight.co.nz, ph +64 21 554 8890. Please advise.",
+      "pii": [
+        {"value": "0001045567", "type": "CUSTOMER_NO"},
+        {"value": "Harbour Freight Ltd", "type": "ORG_NAME"},
+        {"value": "Aroha Ngata", "type": "PERSON"},
+        {"value": "aroha.ngata@harbourfreight.co.nz", "type": "EMAIL"},
+        {"value": "+64 21 554 8890", "type": "PHONE"}
+      ]
+    },
+    {
+      "id": "TKT-0002",
+      "source_type": "ticket",
+      "text": "Pricing condition PR00 not determined for material on PO to vendor 0000778812. User BJOHNSON ran ME23N and saw net price 0.00. Vendor contact: Bill Johnson, 44 Victoria Street, Wellington 6011.",
+      "pii": [
+        {"value": "0000778812", "type": "VENDOR_NO"},
+        {"value": "BJOHNSON", "type": "USER_ID"},
+        {"value": "Bill Johnson", "type": "PERSON"},
+        {"value": "44 Victoria Street, Wellington 6011", "type": "ADDRESS"}
+      ]
+    },
+    {
+      "id": "TKT-0003",
+      "source_type": "ticket",
+      "text": "Invoice IDoc failing in VF04 collective run. Bill-to customer 0001099233. Finance contact Meera Patel (meera.patel@globex.com) escalated; remittance IBAN NZ29 0011 2233 4455 6677 88 rejected by bank.",
+      "pii": [
+        {"value": "0001099233", "type": "CUSTOMER_NO"},
+        {"value": "Meera Patel", "type": "PERSON"},
+        {"value": "meera.patel@globex.com", "type": "EMAIL"},
+        {"value": "NZ29 0011 2233 4455 6677 88", "type": "IBAN"}
+      ]
+    },
+    {
+      "id": "TKT-0004",
+      "source_type": "ticket",
+      "text": "CPI iFlow to endpoint 10.42.7.19 returning 500 on outbound delivery. Integration owner Tomasz Kowalski, tomasz.kowalski@acme-logistics.pl. Affects shipments for customer 0001200456.",
+      "pii": [
+        {"value": "10.42.7.19", "type": "IP_ADDRESS"},
+        {"value": "Tomasz Kowalski", "type": "PERSON"},
+        {"value": "tomasz.kowalski@acme-logistics.pl", "type": "EMAIL"},
+        {"value": "0001200456", "type": "CUSTOMER_NO"}
+      ]
+    },
+    {
+      "id": "TKT-0005",
+      "source_type": "ticket",
+      "text": "Output type not triggering for order confirmation. NAST record missing. Requested by Sione Tuilagi from Pacific Traders, phone 09 445 2210, sione.t@pacifictraders.example.",
+      "pii": [
+        {"value": "Sione Tuilagi", "type": "PERSON"},
+        {"value": "Pacific Traders", "type": "ORG_NAME"},
+        {"value": "09 445 2210", "type": "PHONE"},
+        {"value": "sione.t@pacifictraders.example", "type": "EMAIL"}
+      ]
+    },
+    {
+      "id": "TKT-0006",
+      "source_type": "ticket",
+      "text": "GR/IR mismatch on vendor 0000556677 (Northwind Supplies GmbH). Posted by user KMUELLER. Contact Klaus Mueller at klaus.mueller@northwind.de, Hauptstrasse 12, 80331 Munich.",
+      "pii": [
+        {"value": "0000556677", "type": "VENDOR_NO"},
+        {"value": "Northwind Supplies GmbH", "type": "ORG_NAME"},
+        {"value": "KMUELLER", "type": "USER_ID"},
+        {"value": "Klaus Mueller", "type": "PERSON"},
+        {"value": "klaus.mueller@northwind.de", "type": "EMAIL"},
+        {"value": "Hauptstrasse 12, 80331 Munich", "type": "ADDRESS"}
+      ]
+    },
+    {
+      "id": "EXP-0001",
+      "source_type": "expert",
+      "text": "Known issue: when IDoc is in status 51 with 'ship-to party not found', check the customer-material info record (VD51N) and the partner function assignment in the sold-to master. Usually the ship-to (SH) partner is missing on the customer account group. No customer data needed to resolve.",
+      "pii": []
+    },
+    {
+      "id": "EXP-0002",
+      "source_type": "expert",
+      "text": "For PR00 not determined: verify the condition record validity dates in VK13 and the pricing procedure determination (OVKK) for the sales area. Reviewed by senior consultant Priya Raman, priya.raman@ourcompany.example, ext 4471.",
+      "pii": [
+        {"value": "Priya Raman", "type": "PERSON"},
+        {"value": "priya.raman@ourcompany.example", "type": "EMAIL"},
+        {"value": "ext 4471", "type": "PHONE"}
+      ]
+    },
+    {
+      "id": "FSD-0001",
+      "source_type": "fsd",
+      "text": "Functional Spec ZSD_REBATE_001: custom rebate accrual enhancement for condition contract settlement. Author: Daniel O'Connor (daniel.oconnor@ourcompany.example). Go-live 2024-03-11, CR 448120. Objects: ZSD_REBATE_CALC (function group), enhancement spot ES_SD_REBATE. Worked example uses customer 0001045567.",
+      "pii": [
+        {"value": "Daniel O'Connor", "type": "PERSON"},
+        {"value": "daniel.oconnor@ourcompany.example", "type": "EMAIL"},
+        {"value": "0001045567", "type": "CUSTOMER_NO"}
+      ]
+    },
+    {
+      "id": "FSD-0002",
+      "source_type": "fsd",
+      "text": "FSD ZMM_INV_APPROVAL: invoice approval workflow via BPA. Approver group includes finance manager Rebecca Chen (rebecca.chen@ourcompany.example, DDI +64 4 803 1122). Service account svc_inv_bot calls endpoint https://cpi-tenant.example/http/invapp at 172.16.4.8.",
+      "pii": [
+        {"value": "Rebecca Chen", "type": "PERSON"},
+        {"value": "rebecca.chen@ourcompany.example", "type": "EMAIL"},
+        {"value": "+64 4 803 1122", "type": "PHONE"},
+        {"value": "svc_inv_bot", "type": "USER_ID"},
+        {"value": "172.16.4.8", "type": "IP_ADDRESS"}
+      ]
+    },
+    {
+      "id": "TKT-0007",
+      "source_type": "ticket",
+      "text": "Delivery block not removed automatically. Order for customer 0001300789. No personal contact given, just the internal reference from planner MTANAKA.",
+      "pii": [
+        {"value": "0001300789", "type": "CUSTOMER_NO"},
+        {"value": "MTANAKA", "type": "USER_ID"}
+      ]
+    },
+    {
+      "id": "TKT-0008",
+      "source_type": "ticket",
+      "text": "Tax code V1 not defaulting on PO for vendor 0000889900 (Fields & Sons Pty). Buyer contact Sarah Fields reachable at sarah.fields@fieldsandsons.com.au or 0412 998 776.",
+      "pii": [
+        {"value": "0000889900", "type": "VENDOR_NO"},
+        {"value": "Fields & Sons Pty", "type": "ORG_NAME"},
+        {"value": "Sarah Fields", "type": "PERSON"},
+        {"value": "sarah.fields@fieldsandsons.com.au", "type": "EMAIL"},
+        {"value": "0412 998 776", "type": "PHONE"}
+      ]
+    },
+    {
+      "id": "TKT-0009",
+      "source_type": "ticket",
+      "text": "Batch determination failing for material in outbound delivery. This one is purely technical - class 023 characteristic mismatch. No customer or contact details involved.",
+      "pii": []
+    }
+  ]
+}

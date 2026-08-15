@@ -1,0 +1,60 @@
+apiVersion: ai.sap.com/v1alpha1
+kind: ServingTemplate
+metadata:
+  name: pii-scrubber
+  annotations:
+    scenarios.ai.sap.com/name: "pii-scrubber"
+    scenarios.ai.sap.com/description: "Local PII scrubbing for the SAP incident KB (Presidio + GLiNER)"
+    executables.ai.sap.com/name: "pii-scrubber-serve"
+    executables.ai.sap.com/description: "Inference-only serving of the PII scrubber"
+  labels:
+    scenarios.ai.sap.com/id: "pii-scrubber"
+    executables.ai.sap.com/id: "pii-scrubber-serve"
+    ai.sap.com/version: "1.0.0"
+
+spec:
+  inputs:
+    parameters:
+      - name: engine            # presidio | gliner | both
+        type: string
+        default: "presidio"
+      - name: glinerThreshold
+        type: string
+        default: "0.4"
+
+  template:
+    apiVersion: "serving.kserve.io/v1beta1"
+
+    metadata:
+      annotations: |
+        autoscaling.knative.dev/metric: concurrency
+        autoscaling.knative.dev/target: 1
+        autoscaling.knative.dev/targetBurstCapacity: 0
+      labels: |
+        ai.sap.com/resourcePlan: starter
+
+    spec: |
+      predictor:
+        imagePullSecrets:
+          - name: docker-registry-secret
+        minReplicas: 1
+        maxReplicas: 1
+        containers:
+        - name: kserve-container
+          # >>> REPLACE with your pushed image <<<
+          image: "docker.io/YOUR_DOCKER_USER/pii-scrubber:1.0.0"
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          env:
+            - name: SCRUBBER_ENGINE
+              value: "{{inputs.parameters.engine}}"
+            - name: GLINER_THRESHOLD
+              value: "{{inputs.parameters.glinerThreshold}}"
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
