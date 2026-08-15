@@ -228,7 +228,19 @@ Do not touch: scenario/executable/version labels · `resourcePlan: starter` · `
 
 ---
 
-## Task 6 — AI Core deployment · ☐ · ~60 min · ⚠️ **BTP** · user drives · needs U4, U5
+## Task 6 — AI Core deployment · ✅ · ~60 min · ⚠️ **BTP** · user drives · needs U4, U5
+
+> **Completed 2026-08-15. Deployment `d321900053823717`, status RUNNING.**
+>
+> Deployed `/v1/selftest`: **`recall_pct 100.0` · `45/45` · `missed 0` ·
+> `over_detections 6`** — **IDENTICAL** to the container baseline
+> (`/tmp/selftest-container.json`), which is the correct comparison per Step 6.6.
+> Live `/v1/scrub` verified end to end. `engine=presidio` throughout; `both` never
+> attempted (finding 11).
+>
+> Reaching RUNNING took four attempts and four distinct root causes, all now logged:
+> application path (14), registry-secret delivery (15), free-tier pod quota (16), and
+> the two diagnostic lessons (17, 18). None was a defect in the service itself.
 
 - [ ] 6.1 **Resolve the Git-sync question first (U4)** — if AI Core watches a different repo, Task 5's commit is misplaced. ✅ answered; see the blocked-on-user table.
 - [ ] 6.1b **Confirm the Application's *Path in Repository* is a real subdirectory, not `.`** — see finding 14. `.` syncs **nothing**, silently. The ServingTemplate must live under that subdirectory; in this repo it is `workflows/serving_template.yaml`.
@@ -367,7 +379,28 @@ Stop and report rather than working around any of these:
 
     ✅ **RESOLVED 2026-08-15** — after the secret was recreated, a subsequent deployment (`dd5e9a82eda6c61b`) got past image resolution entirely; no `UNAUTHORIZED` in its status.
 
-16. **Free tier allows exactly one pod — a recovered old deployment blocks its replacement** — ⛔ **OPEN at time of writing, fix is cockpit-side.** Deployment `dd5e9a82eda6c61b` fails with `exceeded quota: free-tier-resource-quota, requested: pods=1, used: pods=1, limited: pods=1`. Sequence that produces this: the first deployment (`d455a957ca2e8dcb`) sat PENDING on the secret failure; the secret was fixed; **KServe's retry then succeeded on the old deployment**, which silently claimed the single pod slot; the newly created replacement is quota-locked by its own predecessor. Fix: stop **and delete** every deployment except the intended one; Kubernetes retries automatically once quota frees — no recreation needed. Rule for free tier going forward: **never have two deployments in existence simultaneously**, even if one looks dead — PENDING deployments recover when their blocker clears. This machine is Apple Silicon (`uname -m` → `arm64`) and neither the `Dockerfile` nor any plan step specifies `--platform`, so `docker build` produced a native arm64 image and `docker push` published it as an OCI index containing **exactly one runnable platform: `linux/arm64`** (plus a buildkit attestation manifest, `unknown/unknown`, which is normal provenance and not a second platform).
+16. **Free tier allows exactly one pod — a recovered old deployment blocks its replacement** — ⛔ **OPEN at time of writing, fix is cockpit-side.** Deployment `dd5e9a82eda6c61b` fails with `exceeded quota: free-tier-resource-quota, requested: pods=1, used: pods=1, limited: pods=1`. Sequence that produces this: the first deployment (`d455a957ca2e8dcb`) sat PENDING on the secret failure; the secret was fixed; **KServe's retry then succeeded on the old deployment**, which silently claimed the single pod slot; the newly created replacement is quota-locked by its own predecessor. Fix: stop **and delete** every deployment except the intended one; Kubernetes retries automatically once quota frees — no recreation needed. Rule for free tier going forward: **never have two deployments in existence simultaneously**, even if one looks dead — PENDING deployments recover when their blocker clears.
+
+    ✅ **RESOLVED 2026-08-15.** Final deployment `d321900053823717` reached RUNNING. **Sharper statement of the trap than the one above:** a stop-then-create race does not merely queue — it marks the new revision **failed permanently**. Kubernetes does not re-drive a revision that was rejected at admission, so the deployment stays dead even after quota frees. **Recycle the deployment** (delete and create one, cleanly, with nothing else in existence) rather than waiting for a retry that will never come. Three deployments were burned this way — `d455a957ca2e8dcb`, `dd5e9a82eda6c61b`, `d89c9e9313b59780` — before `d321900053823717` succeeded on a clean slate.
+
+17. **Git-repo onboarding never validates credentials — "COMPLETED" does not mean working** — ℹ️ **CLOSED, diagnostic lesson.** AI Core's *Git Repositories* onboarding reports status `COMPLETED` on the basis of having stored the configuration, **not** on having successfully reached or read the repository. Combined with finding 14's cosmetic sync panel, the free-tier UI offers **no true signal anywhere** that a repository or application is functioning.
+
+    **The one reliable source is the API**, not the Launchpad:
+    ```
+    GET $AI_API/v2/admin/repositories
+    GET $AI_API/v2/admin/applications/{name}/status     <- names the actual rejection
+    GET $AI_API/v2/lm/scenarios                          (AI-Resource-Group: default)
+    ```
+    The `applications/{name}/status` endpoint exposes per-resource sync errors that the UI hides entirely. **Go there first** on any future sync problem, rather than inferring from cockpit panels — this session lost substantial time to panels that display identically whether things work or not.
+
+18. **Two credentials, two scopes — and GitHub's 403 misleads in both directions** — ℹ️ **CLOSED, carry forward.** The pipeline needs *two distinct* GitHub credentials that are easy to conflate:
+
+    | Consumer | Purpose | Required scope |
+    |---|---|---|
+    | AI Core **Git sync** (Application) | read the repo, pull `workflows/serving_template.yaml` | **`repo`** |
+    | AI Core **`docker-registry-secret`** | pull the image from `ghcr.io` | **`read:packages`** |
+
+    A token carrying one is rejected for the other, and **GitHub's 403 text does not distinguish "wrong scope" from "wrong credential" in either case** — it reads as an authentication failure when it is an authorization one. Seen twice this session: the push blocked on missing `write:packages` (finding 12) presented as an auth problem, and the deployment's `UNAUTHORIZED: authentication required` (finding 15) was likewise a scope/credential-delivery issue, not bad credentials. **When ghcr or the Git sync returns 401/403, check the scope before touching the credential.** This machine is Apple Silicon (`uname -m` → `arm64`) and neither the `Dockerfile` nor any plan step specifies `--platform`, so `docker build` produced a native arm64 image and `docker push` published it as an OCI index containing **exactly one runnable platform: `linux/arm64`** (plus a buildkit attestation manifest, `unknown/unknown`, which is normal provenance and not a second platform).
 
     ```
     Manifests:
@@ -401,6 +434,10 @@ Stop and report rather than working around any of these:
 | 2026-08-15 | Pre-flight | — | `mine_allowlist.py` added; DD03L dropped; U6 answered (TSTC + DD02L in hand); candidates-merge defect found and mitigated in Task 2.3b |
 | 2026-08-15 | Pre-flight | — | Fix drop applied (`FIXES-2026-08-15.md` + `test_fixes.py`): all 3 findings fixed at source. Task 2.6 resolved as Option A; finding 1 closed, 2 downgraded; Task 1 gains `test_fixes.py` step. Statically verified here; runtime 15/15 pending Task 1 |
 | 2026-08-15 | Task 0 | 0 ✅ | Repo initialised on `deploy/aicore-poc`, baseline commit `0c15601`. `.gitignore` + `.python-version` created. uv provisioned CPython 3.12.13. Docker re-verified 29.2.1 / 10 CPU / 8.2 GB. Disk 18 GB free — above the 15 GB gate, thin. Approved |
+| 2026-08-15 | **SESSION CLOSED** | — | **Plan complete, Tasks 0–6 all ✅.** Service RUNNING on SAP AI Core, deployment `d321900053823717`, deployed self-test `100.0 / 45/45 / missed 0 / over_detections 6`, identical to the container baseline. 18 findings logged; the only one left open is **11 (GLiNER / `engine=both` broken)**, deferred by decision to the bake-off session. Standing caveat unchanged: the 100% is 13 synthetic samples the recognizers were tuned against — **not a production figure, not to be presented to management as one.** Next work of value: expand to 50–100 real-shaped samples |
+| 2026-08-15 | Task 6 | 6 ✅ | **Deployed and verified on BTP.** Four attempts, four root causes, none in the service: app path `.` (14), registry-secret delivery (15), free-tier 1-pod quota with permanent revision failure on a stop-then-create race (16). Diagnostic lessons: onboarding `COMPLETED` ≠ working and the free-tier UI has no true signal — use `applications/{name}/status` (17); git-sync needs `repo`, registry secret needs `read:packages`, and GitHub's 403 distinguishes neither (18). Final: `d321900053823717` RUNNING, self-test IDENTICAL to container, live `/v1/scrub` verified |
+| 2026-08-15 | Task 5 | 5 ✅ | ServingTemplate pointed at `ghcr.io/terusin71/pii-scrubber:1.0.0` (`3140875`, one-line diff, 12 assertions). Later moved to `workflows/` (finding 14) and labels aligned to the accepted template — `executables.ai.sap.com/id` removed, version `1.0` (`8a2166f`, finding 14 addendum) |
+| 2026-08-15 | Task 4 | 4 ✅ | Repo `TeruSin71/pii-scrubber-poc` created private, branch pushed, 21 blobs verified against 21 tracked. Image published to `ghcr.io`; first push blocked on missing `write:packages` (12), then republished `linux/amd64` after finding 13 — final digest `sha256:8e779fde…f026a1b`, pull-back and platform both verified |
 | 2026-08-15 | Task 3 | 3 ✅ | **Image built and verified.** `.dockerignore` added (context 864 MB → ~10 MB; `.venv` alone was 858 MB). First build failed after 19 min on a BuildKit lease error, fixed by `docker pull python:3.11-slim` then rebuilding unchanged (finding 9). Image **2.17 GB**, disk 16 GB free. `/info` as expected; `Allowlist loaded: 257583 tokens` matches local. Step 5b: `lg` absent. Self-test **IDENTICAL** to the Task 2 reference (`100.0`, `45/45`, `over_detections 6`). Step 8: networks empty, in-container scrub returned `contact <PERSON> <EMAIL> at <IP_ADDRESS>`, no resolver errors — Rule 3 proven; host-side form confounded (finding 10). GLiNER prefetch failed → **finding 11, `engine=both` is broken on this dependency set**. Build warnings all benign |
 | 2026-08-15 | Task 2 | 2 ✅ | **Allowlist populated.** Checksums verified. Field 2 only; counts matched the export README exactly. **257,578 tokens** (TSTC 147,042 + DD02L 110,536 after removing 852 overlaps; dropped `BP CD CM FW V` as <3 chars and `MC1§` as non-ASCII). `allowlist.txt` 3.0 MB, pure ASCII, `Allowlist loaded: 257583 tokens` (file + 5 unique seed entries). Author cross-check re-verified: 87 IDs, 0 collisions. Clash check OK — `MARA`/`LIPS` allowlisted, `Mara` not, no ground-truth value allowlisted. `recall_pct 100.0` held; `over_detections` **6 → 6**, enumerated and explained in finding 7; finding 3 closed as moot. Step 3b skipped (U7). `COPY` line verified at `Dockerfile:40`. No corpus or candidates file staged |
 | 2026-08-15 | Task 1 | 1 ✅ | **Cleared after the ORG fix.** `recall_pct 100.0` · `45/45` · `missed 0` · `over_detections 6` · `redacting_spans_emitted 51` · `test_fixes.py` **17/17** · `Allowlist loaded: 27 tokens`. Log confirms `ORG un-ignored at NLP layer (11 labels still ignored)` and `Removed UrlRecognizer`. `Pacific Traders` redacts end-to-end as `<ORG_NAME>`. Diff audited: only `get_analyzer()` changed; `samples.json`/`requirements.txt`/`recognizers.py`/`allowlist.txt` byte-identical. Seed-count doc error `28→27` corrected in 3 files. Noted: the fix's `SpacyRecognizer` half is a no-op on 2.2.357 |
