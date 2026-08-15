@@ -36,9 +36,19 @@
 <p class="sub">POC package for BTP Free Tier. Deploys to SAP AI Core (BYOM) — no Cloud Foundry, no Generative AI Hub.</p>
 
 <div class="ok">
-<p><strong>Already verified before you deploy.</strong> The service was executed against the 13 labelled synthetic SAP samples in this session. Result:</p>
-<p><span class="big">100%</span> &nbsp;recall — 45 / 45 planted PII values redacted, 0 misses, 6 over-detections.</p>
-<p class="small">Presidio + custom SAP recognizers, engine=<code>presidio</code>, no GLiNER yet. Three real defects were found and fixed during that run (see “What testing caught”). You are deploying tested code, not first-draft code.</p>
+<p><strong>Verified — and this runbook has now been executed end to end.</strong> The service is deployed and RUNNING on SAP AI Core (deployment <code>d5e6ea76217ed207</code>, image <code>ghcr.io/terusin71/pii-scrubber:1.1.0</code>, <code>linux/amd64</code>). Two different numbers, and only one of them is quotable:</p>
+<p><span class="big">96.4%</span> &nbsp;<strong>holdout recall</strong> — 107 of 111 planted values, on 40 samples never used for tuning. <strong>This is the figure to quote.</strong></p>
+<p>The self-test still returns <code>recall_pct 100.0</code> (45/45, 0 misses, 6 over-detections), but that is a <strong>regression baseline, not a result</strong> — the recognizers were tuned against those same 13 samples, so 100% is close to guaranteed. Its job is to prove that packaging and deploying changed nothing.</p>
+<p class="small">Presidio + nine custom SAP recognizers, engine=<code>presidio</code>. Four real defects were found and fixed before deployment (see “What testing caught”), and a fifth — no street-address recognizer at all — was closed afterwards, taking ADDRESS from 0/3 to 3/3 on the holdout.</p>
+</div>
+
+<div class="warn">
+<p><strong>Corrections to this document, 2026-08-15.</strong> Sections 2, 3 and 7 were wrong as originally written and are fixed below. If you are working from a printed or cached copy, check these three:</p>
+<ul>
+<li><strong>§2</strong> — the registry secret host must be <code>https://ghcr.io</code>, not <code>https://index.docker.io</code>.</li>
+<li><strong>§3</strong> — the template lives at <code>workflows/serving_template.yaml</code>. AI Core does <em>not</em> scan the repo root, and a Path in Repository of <code>.</code> syncs nothing while reporting no error.</li>
+<li><strong>§7</strong> — <code>engine = both</code> does <strong>not</strong> work on this image and is not a configuration-only change. It crash-loops.</li>
+</ul>
 </div>
 
 <h2>Files in this package</h2>
@@ -49,17 +59,25 @@
 <tr><td><code>samples.json</code></td><td>13 labelled synthetic SAP samples (ground truth for the self-test)</td></tr>
 <tr><td><code>allowlist.txt</code></td><td>Technical tokens never redacted — <strong>populate from TSTC</strong></td></tr>
 <tr><td><code>Dockerfile</code></td><td>Builds the image with model weights baked in (no runtime downloads)</td></tr>
-<tr><td><code>serving_template.yaml</code></td><td>AI Core ServingTemplate — goes in your onboarded Git repo</td></tr>
+<tr><td><code>workflows/serving_template.yaml</code></td><td>AI Core ServingTemplate. <strong>Must sit in a subdirectory</strong>, not the repo root — see §3</td></tr>
+<tr><td><code>test_deployed.py</code></td><td>Holdout evaluation against the deployed service (or a local one via <code>SCRUB_URL</code>)</td></tr>
+<tr><td><code>test_fixes.py</code> · <code>test_address.py</code></td><td>Regression tests for the fixed defect classes and the street-address recognizer</td></tr>
 <tr><td><code>requirements.txt</code></td><td>Pinned dependencies</td></tr>
 </table>
 
 <h2>Deployment steps</h2>
 
 <h3>1. Build &amp; push the image <span class="tag you">YOU</span></h3>
-<p>Needs Docker and a registry account (Docker Hub is fine for a POC).</p>
+<p>Needs Docker and a registry account. This project uses <code>ghcr.io</code>; the PAT needs <strong>Packages: write</strong> to push and only <strong>read:packages</strong> for AI Core to pull.</p>
+<p><strong>The <code>--platform</code> flag is mandatory on Apple Silicon.</strong> SAP AI Core runs x86_64. A native build on an ARM Mac produces an arm64 image that pushes, pulls and verifies by digest perfectly — and then fails at pod start with <code>exec format error</code>. A digest check cannot catch this; check the platform explicitly.</p>
 <pre><code>cd pii-scrubber-poc
-docker build -t YOUR_USER/pii-scrubber:1.0.0 .
-docker push YOUR_USER/pii-scrubber:1.0.0</code></pre>
+docker buildx build --platform linux/amd64 \
+  -t ghcr.io/YOUR_USER/pii-scrubber:1.1.0 --push .
+
+# verify the platform, not just the digest
+docker buildx imagetools inspect ghcr.io/YOUR_USER/pii-scrubber:1.1.0
+#   -> must list  Platform: linux/amd64</code></pre>
+<p class="small">Emulated amd64 builds are cheap here (~3 min): pip installs prebuilt manylinux wheels, so QEMU emulates almost nothing. If a build dies with <code>lease does not exist: not found</code>, that is a corrupted BuildKit lease, not disk or network — <code>docker pull</code> the base image and rebuild unchanged.</p>
 <p class="small">Build takes a while — torch + GLiNER weights are baked in. To build a slim Presidio-only image, comment out <code>gliner</code> and <code>torch</code> in <code>requirements.txt</code> and the GLiNER prefetch block in the Dockerfile.</p>
 <p><strong>Test it locally first</strong> — this is the cheapest possible failure:</p>
 <pre><code>docker run -p 8080:8080 YOUR_USER/pii-scrubber:1.0.0
@@ -68,16 +86,33 @@ curl localhost:8080/v1/selftest        # expect recall_pct: 100.0</code></pre>
 
 <h3>2. Docker Registry Secret in AI Core <span class="tag you">YOU</span></h3>
 <p>AI Launchpad → <em>SAP AI Core Administration → Docker Registry Secrets → Add</em>. Name it <code>docker-registry-secret</code> (matches the template).</p>
-<pre><code>{".dockerconfigjson":"{\"auths\":{\"https://index.docker.io\":{\"username\":\"USER\",\"password\":\"TOKEN\"}}}"}</code></pre>
+<pre><code>{".dockerconfigjson":"{\"auths\":{\"https://ghcr.io\":{\"username\":\"TeruSin71\",\"password\":\"PAT\"}}}"}</code></pre>
+<p class="small"><strong>The host must match the registry you actually pushed to.</strong> <code>https://index.docker.io</code> is Docker Hub; using it against a private <code>ghcr.io</code> package does not error — the pull simply runs unauthenticated and the deployment fails with <code>UNAUTHORIZED: authentication required</code> during image resolution. The PAT here needs only <strong>read:packages</strong>; do not reuse a <code>write:packages</code> token, since this credential lives in BTP. AI Core has no secret-edit — to change it, delete and recreate under the same name.</p>
 
 <h3>3. Put the template in your Git repo <span class="tag you">YOU</span></h3>
-<p>Edit <code>serving_template.yaml</code> — replace the <code>image:</code> line with your pushed image. Commit it to the repo already onboarded under <em>Git Repositories</em> (the same mechanism your <code>sd-analytics</code> scenario uses). AI Core syncs roughly every 3 minutes.</p>
+<p>Edit <code>workflows/serving_template.yaml</code> — replace the <code>image:</code> line, and nothing else. Commit and push to the onboarded repo. AI Core syncs roughly every 3 minutes.</p>
+<p><strong>Use the mutable tag, not a digest.</strong> A digest freezes the template to one build, so a corrected image needs a second template edit. The tag lets a rebuild flow through unchanged.</p>
+<div class="warn">
+<p><strong>Three things here fail silently. All three cost a day.</strong></p>
+<ol>
+<li><strong>Path in Repository must be a real subdirectory.</strong> AI Core does not scan the repo root — an application configured with <code>.</code> syncs <em>nothing</em> and reports no error. Ours is <code>workflows</code>, which is why the template lives there rather than at the root.</li>
+<li><strong>The sync status panel is cosmetic on free tier.</strong> A <em>working</em> application shows <code>Sync Status: Unknown</code>, <code>Revision: Unknown</code>, <code>0 synced resources</code> — identical to a broken one. Do not diagnose from it. The only trustworthy evidence is the scenario and its executable appearing in §4.</li>
+<li><strong>Repo onboarding status <code>COMPLETED</code> means “configuration stored”, not “repository reachable”.</strong> It never validates the credential. The git-sync token needs <code>repo</code> scope — a different scope from the registry secret in §2, and GitHub's 403 does not distinguish the two.</li>
+</ol>
+<p>When something is wrong, go to the API rather than the cockpit — <code>GET $AI_API/v2/admin/applications/{name}/status</code> names the actual rejection reason the free-tier UI hides.</p>
+</div>
+<p class="small"><strong>Template shape matters too.</strong> The scenario will not appear if the labels do not match what AI Core accepts: only <code>scenarios.ai.sap.com/id</code> and <code>ai.sap.com/version</code>. An <code>executables.ai.sap.com/id</code> label, or a version of <code>"1.0.0"</code> where the accepted templates use <code>"1.0"</code>, is enough to prevent the sync producing anything.</p>
 
 <h3>4. Confirm the scenario appears <span class="tag you">YOU</span></h3>
 <p><em>ML Operations → Scenarios</em> — <code>pii-scrubber</code> should show up alongside <code>late-delivery</code> and <code>my-first-scenario</code>.</p>
 
 <h3>5. Configuration → Deployment <span class="tag you">YOU</span></h3>
-<p><em>Configurations → Create</em>: pick scenario <code>pii-scrubber</code>, executable <code>pii-scrubber-serve</code>, set parameter <code>engine = presidio</code>. Then <em>Create Deployment</em> from that configuration. Wait for status <strong>RUNNING</strong>.</p>
+<p><em>Configurations → Create</em>: pick scenario <code>pii-scrubber</code>, version <code>1.0</code>, executable <code>pii-scrubber</code>, set parameter <code>engine = presidio</code>. Then <em>Create Deployment</em> from that configuration. Wait for status <strong>RUNNING</strong>. First pull is ~2.5 GB.</p>
+<p class="small">The executable is <code>pii-scrubber</code>, not <code>pii-scrubber-serve</code>: with no <code>executables.ai.sap.com/id</code> label (see §3), it is identified by the template's <code>metadata.name</code>. The <code>…/name</code> annotation still reads <code>pii-scrubber-serve</code> and is cosmetic.</p>
+<div class="warn">
+<p><strong>Free tier allows exactly one pod. Delete the old deployment before creating a new one — do not stop-then-create.</strong></p>
+<p>A stop-then-create race does not queue. The new revision is rejected at admission with <code>exceeded quota: free-tier-resource-quota, pods=1</code> and is then marked failed <em>permanently</em> — Kubernetes never re-drives an admission-rejected revision, so it stays dead even after quota frees. Three deployments were burned this way before a clean-slate create succeeded. Delete everything else first, confirm nothing else exists in the tenant, then create one.</p>
+</div>
 
 <h3>6. Call it <span class="tag you">YOU</span></h3>
 <pre><code># Token
@@ -96,8 +131,14 @@ curl -X POST "$DEPLOYMENT_URL/v1/scrub" \
   -H "Content-Type: application/json" \
   -d '{"text":"IDoc 51 for customer 0001045567, contact Aroha Ngata aroha.ngata@x.co.nz","mode":"batch"}'</code></pre>
 
-<h3>7. Then turn GLiNER on <span class="tag you">YOU</span></h3>
-<p>Create a second configuration with <code>engine = both</code> and deploy it. Compare <code>/v1/selftest</code> between the two — that is your Presidio-vs-Presidio+GLiNER bake-off, measured on BTP. No rebuild needed.</p>
+<h3>7. GLiNER — <span style="color:#b42318">blocked, do not attempt on this image</span> <span class="tag you">YOU</span></h3>
+<div class="warn">
+<p><strong>This section previously said “create a second configuration with <code>engine = both</code> … No rebuild needed.” That was wrong.</strong> Setting <code>engine = both</code> against image <code>1.1.0</code> crash-loops the deployment.</p>
+<pre><code>TypeError: GLiNER._from_pretrained() missing 2 required
+keyword-only arguments: 'proxies' and 'resume_download'</code></pre>
+<p><code>gliner==0.2.16</code> is incompatible with the <code>huggingface_hub</code> version pip currently resolves. The failing call is <code>GLiNER.from_pretrained</code> — exactly what <code>get_gliner()</code> invokes at runtime — so the failure happens on the first request, not at startup. The weights are not baked in either: the Dockerfile's GLiNER prefetch fails for the same reason and is tolerated by design, leaving a Presidio-only image.</p>
+<p><strong>It is therefore a dependency fix plus a rebuild, not a configuration change.</strong> Pin <code>huggingface_hub</code> in <code>requirements.txt</code> to a version whose <code>hub_mixin.from_pretrained</code> matches gliner's <code>_from_pretrained</code> signature, rebuild, and re-verify. Changing a pin is plan-authorized work requiring approval. The bake-off is a separate session.</p>
+</div>
 
 <h2>What testing caught (before it reached BTP)</h2>
 <p>Three defects the self-test exposed. Each is now fixed and commented in the code — worth knowing because each would have been painful to diagnose inside a deployment:</p>
@@ -105,18 +146,23 @@ curl -X POST "$DEPLOYMENT_URL/v1/scrub" \
   <li><strong>Outbound network call from inside the boundary.</strong> Presidio's <code>UrlRecognizer</code> fetches the public-suffix list from <code>publicsuffix.org</code> at runtime. Removed — a scrubber must not phone out.</li>
   <li><strong>Case-insensitive regex.</strong> Presidio applies <code>IGNORECASE</code> by default, so the SAP user-ID pattern matched ordinary words ("stuck", "status", "sales"). 249 spans on 45 real values. Fixed with explicit case-sensitive flags.</li>
   <li><strong>A leak caused by span ranking.</strong> spaCy labels <code>172.16.4.8</code> as <code>DATE_TIME</code> (0.85), which outranked <code>IP_ADDRESS</code> (0.60) — and DATE is not redacted, so the IP passed through in cleartext. Merge order now always prefers a redacting span over a non-redacting one, regardless of confidence.</li>
+  <li><strong>An entire entity type silently disabled by the library.</strong> <code>presidio-analyzer==2.2.357</code> ships <code>ORG</code> and <code>ORGANIZATION</code> in its default <code>NerModelConfiguration.labels_to_ignore</code>, so spaCy's ORG entity was discarded at the NLP-engine layer before any recognizer ran — making an unsuffixed company name ("Pacific Traders") undetectable. <code>get_analyzer()</code> now rebuilds that ignore list minus ORG. The previously documented baseline had been measured on 2.2.364 installed <em>unpinned</em>; always install from <code>requirements.txt</code> when producing a number anyone will quote.</li>
+  <li><strong>No street-address recognizer existed at all</strong> — found by holdout evaluation, not by the self-test, because the tuned samples did not expose it. ADDRESS scored 0/3 while localities were caught incidentally, so output read <code>the &lt;ADDRESS&gt; office at 22 Willis Street</code>: tag present, identifying detail not. Closed 2026-08-15, ADDRESS now 3/3.</li>
 </ol>
 
 <div class="warn">
-<p><strong>Honest limits of the 100%.</strong> It is 13 synthetic samples that I wrote — a sanity check, not proof. Two caveats: the sample set is small, and I tuned the recognizers against it, so some over-fitting is likely. Expect lower recall on real ticket text. The number that will matter is the one you get after expanding to 50–100 samples drawn from the shapes your real tickets actually take. <strong>Do not present 100% to management as the expected production figure.</strong></p>
+<p><strong>Honest limits of the 100%.</strong> It is 13 synthetic samples that I wrote — a sanity check, not proof. Two caveats: the sample set is small, and I tuned the recognizers against it, so some over-fitting is likely. Expect lower recall on real ticket text. <strong>Do not present 100% to management as the expected production figure.</strong></p>
+<p><strong>This has now been measured, and the prediction held.</strong> A holdout of 40 samples written independently and never used for tuning scores <strong>96.4%</strong> (107 of 111) — that is the quotable figure, and the gap between it and 100% is exactly the over-fitting described above. Four values still leak, in three classes: all-caps and bare surnames (<code>ZHANG</code>, <code>Young</code>), a full name spaCy simply missed (<code>Mere Tuhoe</code>), and a customer number keyed without leading zeros (<code>1045567</code>). Those are the tuning backlog and what the BPA human gate must catch. Expanding the set to 50–100 real-shaped samples remains the highest-value next step — every figure here still rests on 40.</p>
 </div>
 
 <h2>Known over-detections (6 — re-verified 2026-08-15 on current code)</h2>
-<p>All safe-but-noisy — extra redaction, never a leak. Mostly spaCy's small model mislabelling technical phrases ("Invoice IDoc" → ORG, "PO" → ADDRESS). Four ways to reduce them, in order of effort: the <strong>deterministic Z*/Y* custom-object rule</strong> (already implemented, <code>CUSTOM_OBJECT_RULE=true</code>), populate the <strong>allowlist</strong> per <code>ALLOWLIST-EXTRACTION.md</code>, switch <code>SPACY_MODEL</code> to <code>en_core_web_lg</code>, or enable GLiNER (<code>engine=both</code>).</p>
+<p>All safe-but-noisy — extra redaction, never a leak. Mostly spaCy's small model mislabelling technical phrases ("Invoice IDoc" → ORG, "PO" → ADDRESS). Ways to reduce them, in order of effort: the <strong>deterministic Z*/Y* custom-object rule</strong> (already implemented, <code>CUSTOM_OBJECT_RULE=true</code>), the <strong>allowlist</strong> per <code>ALLOWLIST-EXTRACTION.md</code> (now populated — 257,578 tokens from <code>TSTC</code> + <code>DD02L</code>), or switch <code>SPACY_MODEL</code> to <code>en_core_web_lg</code>.</p>
+<p class="small"><strong>Two corrections here.</strong> Enabling GLiNER is no longer on this list — see §7, it does not run. And the allowlist, though populated, did <em>not</em> reduce this count: none of the six is an SAP technical token, so no transaction-code or table-name list can reach them. <code>PO</code> is two characters and excluded by design as too collision-prone; "Invoice IDoc" is a two-word span a single-token allowlist structurally cannot match; <code>Bill</code> and <code>Munich</code> are spaCy mislabelling ordinary English. The remaining lever for this class is the SAP jargon glossary, still outstanding.</p>
 
 <h2>Free-tier watch-items</h2>
 <ul>
-  <li><strong>Memory.</strong> The <code>starter</code> resource plan is CPU-only and small. Presidio-only fits comfortably; adding GLiNER may not. If the deployment crash-loops, that is why — stay on <code>engine=presidio</code> and raise the plan later.</li>
+  <li><strong>One pod. Exactly one.</strong> The quota is <code>pods=1</code> across the tenant. Delete an existing deployment before creating another — a stop-then-create race marks the new revision failed <em>permanently</em>, not queued. See §5.</li>
+  <li><strong>Memory.</strong> The <code>starter</code> resource plan is CPU-only and small. Presidio-only fits comfortably. If a deployment crash-loops, check the registry secret first (§2) — a private-package pull failure is the more common cause and surfaces as a generic image-pull error. Stay on <code>engine=presidio</code>; do not raise the resource plan, that has cost implications and is the account owner's call.</li>
   <li><strong>Not for real data.</strong> Free tier has no SLA and is resettable. Synthetic samples only.</li>
   <li><strong>Cloud Foundry is untouched.</strong> This uses none of your 3.44 GB / 4 GB CF quota.</li>
 </ul>
