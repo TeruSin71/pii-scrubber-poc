@@ -286,8 +286,17 @@ a real number, authored externally and run once.
 
 - **Rule 3:** no outbound calls. No bare `AnalyzerEngine()`.
 - **Rule 7:** no dependency changes.
-- **Rule 4:** no real ticket text; the new probe batch is synthetic and
-  **gitignored** like every other evaluation set.
+- **Rule 4:** no real ticket text. The probe batch is synthetic and
+  **COMMITTED — not gitignored.** ⚠️ *Amended 2026-08-16 at Task 3; the
+  original line said gitignored and was wrong.* Burned and blind sets are
+  kept out of the repo because **visibility destroys them** — a holdout
+  anyone can read while tuning stops measuring anything. A **development
+  verification set is the opposite: visibility is its purpose.** It exists to
+  be built against and re-run, so hiding it defeats it. The precedent is
+  `address_verify_samples.json`, the Gate-2 address batch, which is tracked —
+  and Q2 assigned this batch "the same standing". The original error came
+  from pattern-matching "evaluation set → gitignore" without asking which
+  kind of set it is.
 - Always `--platform linux/amd64`, verified with `imagetools inspect`.
 - `BUILD_VERSION` defaults to `dev`; build with `--build-arg BUILD_VERSION=1.2.3`.
 - **Do not tune against any of the four burned sets.**
@@ -343,8 +352,22 @@ asserted.
 
 ### Task 3 — author the FAC probe batch (no code)
 
-`fac_probe_samples.json`, gitignored, `_provenance` block stating it is
-Claude-authored and verification-only. Two halves, both required:
+`fac_probe_samples.json`, **committed** (see the amended Rule 4 in §6), with a
+`_provenance` block stating it is agent-authored and verification-only. Two
+halves, both required.
+
+⚠️ **Control sourcing amended 2026-08-16.** The original text sourced
+negative controls from "the control samples" — i.e. the burned corpora. Task
+3 keeps those **closed**, so controls come instead from **(a)** `HANDOVER.md`'s
+named trap list, **(b)** `glossary.txt`, **(c)** `test_address.py` /
+`test_jargon.py`, and **(d)** fresh authorship in business-document register.
+**Every control records its provenance, and none may claim corpus-observed
+provenance** — the burned sets were not read.
+
+This is a smaller loss than it looks: **a control's evidence is the container
+observation, not where its string came from.** Corpus-string coverage is
+already held, with stronger standing, by the Task-5 exact gates — which run
+against all four corpora and must not move.
 
 **Must redact** — the class item 3 closes:
 - "The warehouse on Willis Street has no dock access."

@@ -1,0 +1,197 @@
+{
+  "_meta": {
+    "name": "FAC probe batch",
+    "release": "1.2.3, item 3 (FAC -> ADDRESS)",
+    "authored": "2026-08-16",
+    "author": "agent-authored (Claude), during the 1.2.3 build session",
+    "standing": "DEVELOPMENT VERIFICATION SET. Same standing as address_verify_samples.json: fine to build against, NEVER quotable. It is committed on purpose -- burned and blind sets are hidden because visibility destroys them; a verification set is the opposite, visibility is its purpose.",
+    "not_a_measurement": "This batch produces no recall figure. The blind measurement of the FAC mapping is batch v4, reviewer-authored, unseen by this session before it runs.",
+    "purpose": "Evidence for promoting spaCy's FAC label to ADDRESS. The class the mapping exists for is the UNNUMBERED street / facility reference ('the warehouse on Willis Street'), which the street_address recognizer does not cover -- it requires a leading number, and for ambiguous street types a trailing comma-locality. Numbered forms are included to prove the existing path does not regress.",
+    "control_provenance": "Controls are NOT sourced from the burned corpora (samples.json, holdout_samples.json, eval_samples_v2.json, holdout_v3.json), which stayed closed for this task. Sources are recorded per line in the `provenance` field: trap-list = HANDOVER.md's named trap class; glossary = glossary.txt; test-file = test_address.py / test_jargon.py; authored = written fresh for this batch. No control claims corpus-observed provenance.",
+    "reading_the_pii_field": "For POSITIVE lines, pii carries the value expected to redact once FAC -> ADDRESS ships. For CONTROL lines, pii is EMPTY -- a control asserts that nothing redacts. The `note` and `provenance` fields are metadata and are NEVER transmitted to the service; the harness sends `text` only.",
+    "validation": "Every line's actual behaviour is recorded in fac_probe_validation.md, measured inside ghcr.io/terusin71/pii-scrubber:1.2.2 (sha256:958bd5c3cd7051bd86df5905d072d5342ffd7268d7ae482dae7546f4b3ff3fa6), presidio-analyzer 2.2.357, spacy 3.8.3, en_core_web_sm 3.8.0."
+  },
+  "samples": [
+    {
+      "id": "FACP-01",
+      "source_type": "ticket",
+      "kind": "positive-candidate",
+      "note": "unnumbered street reference, the core class",
+      "text": "Consignment could not be delivered because the warehouse on Willis Street was closed for stocktake.",
+      "pii": [{ "value": "Willis Street", "type": "ADDRESS" }]
+    },
+    {
+      "id": "FACP-02",
+      "source_type": "ticket",
+      "kind": "positive-candidate",
+      "note": "unnumbered street, depot phrasing",
+      "text": "Collection is from the depot on Great South Road and the driver needs the gate code before arrival.",
+      "pii": [{ "value": "Great South Road", "type": "ADDRESS" }]
+    },
+    {
+      "id": "FACP-03",
+      "source_type": "ticket",
+      "kind": "positive-candidate",
+      "note": "unnumbered street, site phrasing",
+      "text": "The driver waited forty minutes outside the site on Foveaux Street before the dock was freed.",
+      "pii": [{ "value": "Foveaux Street", "type": "ADDRESS" }]
+    },
+    {
+      "id": "FACP-04",
+      "source_type": "expert_note",
+      "kind": "positive-candidate",
+      "note": "unnumbered street in a spec-style sentence",
+      "text": "Goods receipt is always booked against the branch on Kaiwharawhara Road rather than the central plant.",
+      "pii": [{ "value": "Kaiwharawhara Road", "type": "ADDRESS" }]
+    },
+    {
+      "id": "FACP-05",
+      "source_type": "ticket",
+      "kind": "positive-candidate",
+      "note": "unnumbered street, ordinary NZ street name",
+      "text": "Please confirm whether the store on Ponsonby Road is still receiving pallet deliveries on Fridays.",
+      "pii": [{ "value": "Ponsonby Road", "type": "ADDRESS" }]
+    },
+    {
+      "id": "FACP-06",
+      "source_type": "ticket",
+      "kind": "positive-candidate",
+      "note": "named facility rather than a street -- probes the wider FAC class",
+      "text": "The pallets were rerouted through Auckland International Airport after the ferry sailing was cancelled.",
+      "pii": [{ "value": "Auckland International Airport", "type": "ADDRESS" }]
+    },
+    {
+      "id": "FACP-07",
+      "source_type": "ticket",
+      "kind": "positive-candidate",
+      "note": "named bridge/route facility",
+      "text": "Freight was delayed for three hours because the Harbour Bridge was closed to heavy vehicles.",
+      "pii": [{ "value": "Harbour Bridge", "type": "ADDRESS" }]
+    },
+    {
+      "id": "FACP-08",
+      "source_type": "functional_spec",
+      "kind": "positive-candidate",
+      "note": "numbered form -- must still redact, proves no regression of the existing recognizer path",
+      "text": "Ship-to on the sales order reads 27 Kauri Street, Onerahi, Whangarei 0110 and the label print is truncating it.",
+      "pii": [{ "value": "27 Kauri Street", "type": "ADDRESS" }]
+    },
+    {
+      "id": "FACP-09",
+      "source_type": "ticket",
+      "kind": "positive-candidate",
+      "note": "numbered form, ambiguous street type with locality -- existing path, no regression",
+      "text": "Deliver the replacement stock to 19 Kereru Court, Rotorua before the end of the week.",
+      "pii": [{ "value": "19 Kereru Court", "type": "ADDRESS" }]
+    },
+
+    {
+      "id": "FACC-01",
+      "source_type": "ticket",
+      "kind": "control",
+      "provenance": "trap-list",
+      "note": "HANDOVER trap class: street-type word as an SAP storage-bin noun",
+      "text": "Stock is sitting in Handling Unit Place and the putaway strategy will not resolve it.",
+      "pii": []
+    },
+    {
+      "id": "FACC-02",
+      "source_type": "ticket",
+      "kind": "control",
+      "provenance": "trap-list",
+      "note": "HANDOVER trap class: transaction-screen noun containing a street type",
+      "text": "The 2 Bin View shows the wrong quantity after the transfer order was confirmed.",
+      "pii": []
+    },
+    {
+      "id": "FACC-03",
+      "source_type": "ticket",
+      "kind": "control",
+      "provenance": "test-file",
+      "note": "test_address.py negative: numbered warehouse-fixture phrase, must never be an address",
+      "text": "Scanner cannot read the label on 20 Pallet Rack Row so the count is blocked.",
+      "pii": []
+    },
+    {
+      "id": "FACC-04",
+      "source_type": "ticket",
+      "kind": "control",
+      "provenance": "test-file",
+      "note": "test_customer_number.py negative: 3 Way match, street type as an ordinary process noun",
+      "text": "Invoice is blocked because the 3 Way match failed against the goods receipt.",
+      "pii": []
+    },
+    {
+      "id": "FACC-05",
+      "source_type": "ticket",
+      "kind": "control",
+      "provenance": "glossary",
+      "note": "glossary.txt entry: Basis as an SAP module, in a facility-ish position",
+      "text": "The issue was routed to Basis for the dump analysis and no customer data is involved.",
+      "pii": []
+    },
+    {
+      "id": "FACC-06",
+      "source_type": "ticket",
+      "kind": "control",
+      "provenance": "glossary",
+      "note": "glossary.txt entries: DC as a facility abbreviation, Driver as a role noun",
+      "text": "The Driver returned the load to the DC because the receiving bay was full.",
+      "pii": []
+    },
+    {
+      "id": "FACC-07",
+      "source_type": "expert_note",
+      "kind": "control",
+      "provenance": "authored",
+      "note": "generic facility common nouns -- no proper name, must never redact",
+      "text": "Deliveries are staged at the central warehouse and released to the loading dock once the paperwork clears.",
+      "pii": []
+    },
+    {
+      "id": "FACC-08",
+      "source_type": "expert_note",
+      "kind": "control",
+      "provenance": "authored",
+      "note": "street-type words as ordinary nouns: Way, Close, Rise, Court",
+      "text": "There is no clean Way to Close this ticket while the Rise in short shipments is still under review by the Court of enquiry.",
+      "pii": []
+    },
+    {
+      "id": "FACC-09",
+      "source_type": "functional_spec",
+      "kind": "control",
+      "provenance": "authored",
+      "note": "near-miss: technical object names that read like facilities",
+      "text": "Movement type 311 posts from Storage Location Yard into Plant Building before the batch job runs.",
+      "pii": []
+    },
+    {
+      "id": "FACC-10",
+      "source_type": "ticket",
+      "kind": "control",
+      "provenance": "authored",
+      "note": "near-miss: printer and queue names in a facility-shaped sentence",
+      "text": "Print queue ZLP_CHC01 on the Christchurch spooler stopped after the overnight restart.",
+      "pii": []
+    },
+    {
+      "id": "FACC-11",
+      "source_type": "ticket",
+      "kind": "control",
+      "provenance": "authored",
+      "note": "near-miss: room and area references inside a building, not an address",
+      "text": "The archive boxes were moved from the mezzanine level to the cold store on the far side of the yard.",
+      "pii": []
+    },
+    {
+      "id": "FACC-12",
+      "source_type": "functional_spec",
+      "kind": "control",
+      "provenance": "authored",
+      "note": "near-miss: SAP org units that sound geographic",
+      "text": "Sales organisation North Island reports into distribution channel Wholesale for rebate settlement.",
+      "pii": []
+    }
+  ]
+}
