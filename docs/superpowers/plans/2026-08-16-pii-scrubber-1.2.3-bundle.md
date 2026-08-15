@@ -242,7 +242,39 @@ optimism.
 | `eval_samples_v2.json` | **`65/68`**, leaks `44 Bellbird Rise` `Okonkwo` `FONTAINE` | ⛔ stop, rise or fall |
 | `holdout_v3.json` | **`45/50`**, five known leaks | ⛔ stop, rise or fall |
 | Suites | 16 · 39 · 33 · 74 · 17 · **13 changes by design** | ⛔ stop |
-| `test_label_map.py` | `FAC` flips from *reported* to *not reported*; `unmapped_labels()` → `[]` | **This is the one registered flip in the release** |
+| `test_label_map.py` | ~~`FAC` flips from *reported* to *not reported*; `unmapped_labels()` → `[]`~~ | ~~**This is the one registered flip in the release**~~ ⛔ **CANCELLED — see below** |
+
+### ⛔ CANCELLATION of the one registered flip — 2026-08-16, reviewer-confirmed
+
+**The `["FAC"] → []` flip registered above is CANCELLED, together with item 3.**
+
+Scope of 1.2.3 was reduced by the reviewer, confirmed by Teru, to **Tasks 1-2
+plus corrections**. Item 3 (`FAC → ADDRESS` in `LABEL_MAP`) is **withdrawn**;
+the original Task 4 that would have landed it is **dead**. The flip was
+registered *against the mapping commit*, and with no mapping commit there is
+nothing to flip.
+
+**The registered value is therefore now: `unmapped_labels()` stays `["FAC"]`,
+and `/v1/info` ships `["FAC"]`.** `FAC` remains *reported* in
+`test_label_map.py`. Both were already true before this release; the release
+does not move them.
+
+**Why it was withdrawn — the mapping was measured to be a no-op, not merely
+unproven.** `FAC` never reaches `LABEL_MAP`: `SpacyRecognizer` does not
+declare support for the entity, so the span is dropped at the recognizer.
+Proven ephemerally in the pinned container — `detect()` returns `[]` both
+before and after the mapping. Record: `fac_probe_validation.md`, commit
+`250cdf8`.
+
+**This cancellation is recorded rather than deleted, deliberately.** The
+original registration stays struck through above. A pre-registration that
+quietly disappears when its change is dropped is indistinguishable from one
+that was never made, and the record of *what was predicted and why it was
+withdrawn* is the only thing that makes the next pre-registration credible.
+
+**Nothing else in this table changes.** All four measurements below remain
+registered exact, and the withdrawal of item 3 strengthens rather than
+weakens that prediction: the release now contains no detection surface at all.
 
 ### Why `44 Bellbird Rise` does NOT move
 

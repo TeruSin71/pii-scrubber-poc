@@ -3,14 +3,23 @@
 LABEL_MAP unknown-label warning (bundle 1.2.2, item 2). Trap 8.
 
 The defect: _norm() falls back to `label.upper()` for any entity label
-LABEL_MAP does not carry. That fallback lands outside REDACT_TYPES, so the
-span is DETECTED and then silently discarded -- no warning, no log line, and
-the value reaches the KB in cleartext. A detection that is thrown away is
-indistinguishable from a detection that never happened.
+LABEL_MAP does not carry. That fallback lands outside REDACT_TYPES, so a span
+carrying such a label is discarded with no warning and no log line, and the
+value reaches the KB in cleartext.
 
-This suite asserts the drop is announced, not that it stops happening.
-Mapping FAC to a redacting type would be a detection change and needs its own
-evidence; naming it is what turns a silent failure into a visible one.
+⚠️ Corrected in 1.2.3, and the correction is why the wording above is careful.
+This suite's original text said such spans are "DETECTED and then silently
+discarded". That holds only for a label that actually reaches _norm(), and the
+one label this check has ever reported does not: SpacyRecognizer does not
+declare support for FAC, so it is dropped at the recognizer, before LABEL_MAP.
+unmapped_labels() reports a SUPERSET of the labels that can leak -- it models
+labels_to_ignore and the entity mapping, not supported_entities. See
+fac_probe_validation.md and app.unmapped_labels' docstring.
+
+This suite asserts the gap is announced, not that it stops happening.
+Mapping FAC to a redacting type would be a detection change needing its own
+evidence -- and, measured at Task 3 of 1.2.3, would also be a NO-OP, because
+LABEL_MAP is not the layer that drops it.
 
 Run: python test_label_map.py
 """
@@ -45,15 +54,19 @@ if not callable(getattr(A, "unmapped_labels", None)):
 found = A.unmapped_labels(nlp_engine)
 
 # ---------------------------------------------------------------------------
-# The live case. en_core_web_sm emits FAC; presidio neither maps it to a
-# presidio entity nor ignores it, so FAC arrives at _norm unchanged,
-# has no LABEL_MAP entry, and is dropped.
+# The live case. en_core_web_sm emits FAC and presidio neither maps it to a
+# presidio entity nor ignores it, so it is genuinely unmapped.
 #
 # This corrects the handover, which recorded the defect as reachable "only
-# through en_core_web_lg, which is not shipped". It is reachable on the
-# SHIPPED model, today.
+# through en_core_web_lg, which is not shipped". It is present on the SHIPPED
+# model, today.
+#
+# ⚠️ What it does NOT mean, corrected 1.2.3: FAC does not arrive at _norm.
+# SpacyRecognizer never emits it, so it is dropped a layer earlier. The
+# _norm assertion below is about what WOULD happen to a FAC label reaching
+# _norm -- it is a property of the fallback, not evidence that FAC gets there.
 # ---------------------------------------------------------------------------
-print("The live case -- FAC leaks on the SHIPPED model, not only under lg")
+print("The live case -- FAC is unmapped on the SHIPPED model, not only under lg")
 check("FAC is reported as unmapped", "FAC" in found, f"reported: {found}")
 check("FAC really has no LABEL_MAP entry",
       "FAC" not in A.LABEL_MAP and "fac" not in A.LABEL_MAP)
@@ -181,7 +194,7 @@ finally:
 # at analyzer build, in a fresh process -- the module-level cache means an
 # in-process rebuild would not re-emit it.
 # ---------------------------------------------------------------------------
-print("The warning is emitted at startup, in a fresh process")
+print("The warning is emitted on first analyzer build, in a fresh process")
 
 import subprocess  # noqa: E402
 

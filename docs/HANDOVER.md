@@ -66,18 +66,32 @@ pipeline. Correct about spaCy, irrelevant to the scrubber. This is the new
 **"true measurement taken at the wrong layer"** trap class, recorded in the
 trap list below. Full record: `fac_probe_validation.md`.
 
-### Three descriptions are now known wrong (replacement Task 4)
+### Three descriptions were known wrong — ✅ CORRECTED (replacement Task 4)
 
-Docs and strings only. No behaviour change, no measurement moves.
+Docs and strings only. No behaviour change, no measurement moved. Scope
+confirmed by the reviewer: item 3 withdrawn, original Task 4 dead, no
+detection surface, and **no `supported_entities` modelling** — the
+over-reporting is documented, not fixed.
 
-1. **The 1.2.2 startup warning** says unmapped labels are "DETECTED and then
-   silently dropped". For `FAC` the drop *precedes* detection.
-2. **This handover's trap-8 entry** says `FAC` "reaches `_norm()` raw". It
-   does not.
-3. **`unmapped_labels()` documented semantics** — it models `labels_to_ignore`
-   and the entity mapping but **not** `supported_entities`, so it
-   over-reports. Modelling `supported_entities` is deferred to the recognizer
-   plan; only the documentation is corrected now.
+1. ✅ **The 1.2.2 warning** said unmapped labels are "DETECTED and then
+   silently dropped". For `FAC` the drop *precedes* detection. The shipped
+   log line now states that the check does not model `supported_entities`
+   and that a listed label may be dropped after detection *or* never reach
+   the pipeline. `app.py`, `get_analyzer()`.
+2. ✅ **This handover's trap-8 entry** said `FAC` "reaches `_norm()` raw". It
+   does not. Corrected in place as "Correction 2", with the superseded
+   mechanism kept beside it.
+3. ✅ **`unmapped_labels()` documented semantics** — it models
+   `labels_to_ignore` and the entity mapping but **not**
+   `supported_entities`, so its output is a **superset of the leak list**,
+   not the leak list. Stated in the docstring, at the call site, in the log
+   line, and in trap 8. Modelling `supported_entities` stays deferred to the
+   recognizer plan.
+
+Also corrected, same claims restated in a third file: `test_label_map.py`'s
+module docstring and its live-case comment. A correction applied in two of
+three places is how a document starts disagreeing with itself — the failure
+recorded in `REVIEW-1.2.3-session.md` §5.2.
 
 ### The leak class is real and still open
 
@@ -495,25 +509,53 @@ GET $AI_API/v2/lm/scenarios                          (AI-Resource-Group: default
    hiding a false positive. This produced a false pass on
    `4 Goods Receipt Close` during the address work.
 8. **`LABEL_MAP` silently drops unknown entity labels — ✅ now ANNOUNCED
-   (1.2.2), and the old assessment of it was wrong.** An entity label with no
-   `LABEL_MAP` entry falls through `_norm()`'s `label.upper()` default, lands
-   outside `REDACT_TYPES`, and is discarded — the span was detected and then
-   thrown away, which is indistinguishable from never detecting it.
+   (1.2.2). This entry has been wrong twice; both corrections are kept below,
+   because what it got wrong is more instructive than what it got right.** An
+   entity label with no `LABEL_MAP` entry falls through `_norm()`'s
+   `label.upper()` default, lands outside `REDACT_TYPES`, and is discarded —
+   *for any label that actually reaches `_norm()`.* That qualifier is the
+   second correction, and it is load-bearing.
 
-   ⚠️ **Correction, measured 2026-08-16.** This entry used to say the defect
+   ⚠️ **Correction 1, measured 2026-08-16.** This entry used to say the defect
    was "only reachable through lg, which is not shipped". **False. `FAC` is
-   live on `en_core_web_sm` today.** spaCy `sm` emits `FAC`; presidio neither
-   maps it to a presidio entity nor lists it in `labels_to_ignore`, so it
-   arrives at `_norm()` raw, has no `LABEL_MAP` entry, and is dropped. The
-   defect was never latent on the shipped config — nobody had looked.
+   unmapped on `en_core_web_sm` today.** spaCy `sm` emits `FAC`; presidio
+   neither maps it to a presidio entity nor lists it in `labels_to_ignore`.
+   The gap was never latent on the shipped config — nobody had looked.
 
-   `unmapped_labels()` now computes this from **presidio's own configuration**
-   rather than a reimplemented mapping, and `get_analyzer()` logs it:
+   ⚠️ **Correction 2, measured 2026-08-16 at Task 3 of 1.2.3 — this entry's
+   own mechanism was wrong.** Correction 1 went on to say `FAC` "arrives at
+   `_norm()` raw, has no `LABEL_MAP` entry, and is dropped". **It does not
+   reach `_norm()`.** `SpacyRecognizer` declares support only for
+   `DATE_TIME`/`NRP`/`LOCATION`/`PERSON`/`ORGANIZATION`, so it never emits a
+   `RecognizerResult` for `FAC` and the span is gone one layer earlier, at the
+   recognizer, before `LABEL_MAP` is consulted at all. Verified in the pinned
+   container: `detect()` returns `[]`, and adding `FAC: "ADDRESS"` to
+   `LABEL_MAP` changes nothing. Full record: `fac_probe_validation.md`.
+
+   **Consequence for the diagnostic: `unmapped_labels()` over-reports, by
+   construction.** It models `labels_to_ignore` and the entity mapping but
+   **not** `supported_entities`, so its output is a **superset** of the labels
+   that can leak — every unmapped label, whether or not the pipeline can ever
+   produce one. `FAC` is a true entry in that superset and a false entry in a
+   leak list. The report is still worth making (both cases are gaps, neither
+   redacts), but **do not read the field as a leak list.** Modelling
+   `supported_entities` is deferred to the recognizer plan; 1.2.3 corrected
+   the documentation and the log line only, and moved no detection.
+
+   `unmapped_labels()` computes this from **presidio's own configuration**
+   rather than a reimplemented mapping, and `get_analyzer()` logs it. Current
+   text, as corrected in 1.2.3:
 
    ```
-   WARNING LABEL_MAP has no entry for: FAC -- spans carrying these labels are
-   DETECTED and then silently dropped, never redacted (trap 8)
+   WARNING LABEL_MAP has no entry for: FAC -- these labels have no redacting
+   type, so they are never redacted. This check does not model recognizer
+   supported_entities: a label listed here may be dropped AFTER detection, or
+   may never reach the pipeline at all (FAC is the latter) (trap 8)
    ```
+
+   The 1.2.2 text it replaced said the spans were "DETECTED and then silently
+   dropped, never redacted". Accurate for a label that reaches `_norm()`,
+   wrong for the only label the check has ever reported.
 
    ⚠️ **It fires on first analyzer build, NOT at process start** — model
    loading is lazy so `/health` stays instant and readiness probes never time

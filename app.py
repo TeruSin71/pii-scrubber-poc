@@ -87,10 +87,29 @@ LABEL_MAP = {
 def unmapped_labels(nlp_engine, labels_to_ignore=None) -> List[str]:
     """Entity labels the NLP layer can emit that LABEL_MAP does not translate.
 
-    Such a label falls through _norm's `label.upper()` default, lands
-    outside REDACT_TYPES, and is discarded with no warning -- the span was
-    detected and then thrown away, which is indistinguishable from never
-    having detected it. Trap 8, and the reason the drop is announced.
+    Such a label has no redacting type: it falls through _norm's
+    `label.upper()` default and lands outside REDACT_TYPES. Trap 8, and the
+    reason the gap is announced.
+
+    ⚠️ THIS IS A SUPERSET OF THE LEAK LIST, NOT THE LEAK LIST -- corrected in
+    1.2.3 on measurement, and the correction is the point of the entry.
+    Three filters sit between the model and _norm. This function models two:
+    presidio's `labels_to_ignore` and its entity mapping. It does NOT model
+    the third and narrowest, the registered recognizer's `supported_entities`,
+    which is applied last. A label can therefore be reported here and never
+    reach the pipeline at all.
+
+    FAC is exactly that case on the shipped config: spaCy `sm` emits it,
+    presidio neither maps nor ignores it -- so this function reports it, and
+    correctly, because it IS unmapped -- but SpacyRecognizer declares support
+    only for DATE_TIME/NRP/LOCATION/PERSON/ORGANIZATION, so no
+    RecognizerResult is ever produced and FAC never reaches _norm. The label
+    is right; the old accompanying claim that such spans are "detected and
+    then dropped" was wrong for it. Whether a reported label is dropped AFTER
+    detection or never detected at all is NOT determined by this function.
+    Both are gaps and neither redacts, which is why the report is still worth
+    making. Evidence: fac_probe_validation.md. Modelling supported_entities is
+    deferred to the recognizer plan; only the documentation is corrected here.
 
     Announced on FIRST ANALYZER BUILD, not at process start: model loading is
     lazy so /health stays instant and readiness probes never time out. A pod
@@ -98,7 +117,7 @@ def unmapped_labels(nlp_engine, labels_to_ignore=None) -> List[str]:
 
     Reads presidio's OWN configuration rather than reimplementing it: each
     spaCy label is either translated to a presidio entity, ignored outright,
-    or passed through raw. Only the survivors reach _norm.
+    or passed through raw.
 
     `labels_to_ignore` MUST be the list the engine was actually built with.
     get_analyzer() un-ignores ORG, and reading presidio's installed default
@@ -327,13 +346,17 @@ def get_analyzer():
                 engine = AnalyzerEngine(nlp_engine=nlp_engine,
                                         supported_languages=["en"])
 
-                # Trap 8: an entity label with no LABEL_MAP entry maps nowhere,
-                # never becomes a redacting type, and is dropped in silence.
-                # Announce it. This does NOT change detection -- mapping a
-                # label to a redacting type is a behaviour change needing its
-                # own evidence -- it makes a silent drop a visible one, so a
-                # future model or spaCy upgrade cannot introduce a leak
-                # without saying so at startup.
+                # Trap 8: an entity label with no LABEL_MAP entry maps nowhere
+                # and never becomes a redacting type. Announce it. This does
+                # NOT change detection -- mapping a label to a redacting type
+                # is a behaviour change needing its own evidence -- it makes
+                # an unannounced gap a visible one, so a future model or spaCy
+                # upgrade cannot introduce one without saying so on first
+                # analyzer build.
+                # What this list is NOT: the set of labels that leak. It does
+                # not model the recognizer's supported_entities, so a reported
+                # label may never reach the pipeline at all -- FAC does not.
+                # Superset, deliberately. See unmapped_labels' docstring.
                 # `keep` -- the list THIS engine was built with, not the
                 # installed default. See unmapped_labels' docstring: reading
                 # the default is correct only by coincidence.
@@ -356,9 +379,12 @@ def get_analyzer():
                     _unmapped = unmapped
                     if unmapped:
                         log.warning(
-                            "LABEL_MAP has no entry for: %s -- spans carrying "
-                            "these labels are DETECTED and then silently "
-                            "dropped, never redacted (trap 8)",
+                            "LABEL_MAP has no entry for: %s -- these labels "
+                            "have no redacting type, so they are never "
+                            "redacted. This check does not model recognizer "
+                            "supported_entities: a label listed here may be "
+                            "dropped AFTER detection, or may never reach the "
+                            "pipeline at all (FAC is the latter) (trap 8)",
                             ", ".join(unmapped))
                     else:
                         log.info("LABEL_MAP covers every label the model emits")
