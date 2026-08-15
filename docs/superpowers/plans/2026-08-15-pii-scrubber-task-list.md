@@ -207,6 +207,17 @@ Standing authorization granted for this session; per-command sign-off waived. St
 > so the push is Task 6 Step 1 and is user-driven.
 
 - [ ] 5.1 Edit `serving_template.yaml:45` — the `image:` value only
+
+> **Use the mutable tag, never the digest.** Endorsed 2026-08-15. The `image:` value must
+> be `ghcr.io/<ns>/pii-scrubber:1.0.0`, not `…@sha256:…`. A digest freezes the template to
+> one specific build; when the image is rebuilt — as it was for finding 13, arm64 → amd64,
+> republishing the same tag — a digest-pinned template silently keeps pointing at the old,
+> unrunnable artifact and needs a second edit that Task 5's one-line assertion would then
+> reject. The tag lets a corrected image flow through with no template change at all.
+>
+> The trade-off is real and accepted: a tag is mutable, so the template does not by itself
+> record *which* build is deployed. That provenance lives in the plan's session log and in
+> Step 4.6b's recorded digest instead.
 - [ ] 5.2 `git diff --stat` must show **exactly one line changed**
 - [ ] 5.3 YAML parse + assert labels intact and placeholder gone
 - [ ] 5.4 Commit — **do not push** (push is a BTP mutation, belongs to Task 6)
@@ -305,7 +316,23 @@ Stop and report rather than working around any of these:
 
     ✅ **RESOLVED 2026-08-15** — user ran `gh auth refresh -s write:packages`; scopes now `gist, read:org, repo, write:packages`. Push succeeded.
 
-13. **The published image is `linux/arm64`; AI Core runs `linux/amd64`** — ⛔ **OPEN, hard-blocks Task 6.** This machine is Apple Silicon (`uname -m` → `arm64`) and neither the `Dockerfile` nor any plan step specifies `--platform`, so `docker build` produced a native arm64 image and `docker push` published it as an OCI index containing **exactly one runnable platform: `linux/arm64`** (plus a buildkit attestation manifest, `unknown/unknown`, which is normal provenance and not a second platform).
+13. **The published image was `linux/arm64`; AI Core runs `linux/amd64`** — ✅ **FIXED 2026-08-15.**
+
+    **Resolution.** Rebuilt with `docker buildx build --platform linux/amd64 … --push`. Elapsed **194 seconds** against a 2-hour approved budget — the 60–90 minute estimate was badly wrong, because `pip` installs prebuilt `manylinux` amd64 wheels and there is almost nothing for QEMU to actually emulate. Only the short `RUN` steps are emulated; no compilation occurs.
+
+    | | before | after |
+    |---|---|---|
+    | index digest | `sha256:c57b92e7…a5d3a6c` | **`sha256:8e779fde…f026a1b`** |
+    | platform manifest | `sha256:e4f2c1a2…` linux/arm64 | **`sha256:2ebf5581…` linux/amd64** |
+    | image size | 2.17 GB | 2.54 GB |
+
+    **Step 4.6b passes:** `imagetools inspect` lists `linux/amd64` (plus the normal attestation manifest). **Pull-back passes:** pulled digest equals pushed index digest, `Architecture=amd64`. **Smoke test passes** under emulation: container healthy in 3 s, `Allowlist loaded: 257583 tokens`, self-test `100.0 / 45 / 45 / missed 0 / over_detections 6` — **IDENTICAL** to the arm64 container run, so the platform change altered no behaviour. Container confirmed genuinely x86_64 (`uname -m` and `platform.machine()` both `x86_64` on an arm64 host), ruling out a silent arm64 fallback.
+
+    The old arm64 digest `c57b92e7…` is superseded and must not be referenced anywhere.
+
+    <details><summary>Original finding, kept for the record</summary></details>
+
+    ⛔ **Was: OPEN, hard-blocks Task 6.** This machine is Apple Silicon (`uname -m` → `arm64`) and neither the `Dockerfile` nor any plan step specifies `--platform`, so `docker build` produced a native arm64 image and `docker push` published it as an OCI index containing **exactly one runnable platform: `linux/arm64`** (plus a buildkit attestation manifest, `unknown/unknown`, which is normal provenance and not a second platform).
 
     ```
     Manifests:
