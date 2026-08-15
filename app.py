@@ -90,7 +90,11 @@ def unmapped_labels(nlp_engine) -> List[str]:
     Such a label falls through _norm's `label.upper()` default, lands
     outside REDACT_TYPES, and is discarded with no warning -- the span was
     detected and then thrown away, which is indistinguishable from never
-    having detected it. Trap 8, and the reason this is announced at startup.
+    having detected it. Trap 8, and the reason the drop is announced.
+
+    Announced on FIRST ANALYZER BUILD, not at process start: model loading is
+    lazy so /health stays instant and readiness probes never time out. A pod
+    that has only answered health checks has not logged it yet.
 
     Reads presidio's OWN configuration rather than reimplementing it: each
     spaCy label is either translated to a presidio entity, ignored outright,
