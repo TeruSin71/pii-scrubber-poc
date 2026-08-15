@@ -301,7 +301,7 @@ account with finite free-tier quota.
 ```bash
 source .venv/bin/activate
 
-python test_fixes.py          # 17/17 — the three fixed defect classes + recall invariant
+python test_fixes.py          # 16/16 — the three fixed defect classes + recall invariant
 python test_address.py        # street-address recognizer, positives and negatives
 
 # against the deployment (DEPLOYMENT_ID defaults to d5e6ea76217ed207)

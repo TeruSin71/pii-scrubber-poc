@@ -115,8 +115,14 @@ check("suffixed org still detected",
 
 try:
     from presidio_analyzer.nlp_engine import NerModelConfiguration
-    import presidio_analyzer
-    ver = getattr(presidio_analyzer, "__version__", "unknown")
+    import importlib.metadata
+    # NOT getattr(presidio_analyzer, "__version__"): that attribute does not
+    # exist in 2.2.357, so this line printed "presidio unknown" on every run
+    # since it was written -- including the ORG-fix session whose version
+    # evidence it was meant to be. The installed distribution metadata is the
+    # thing that actually knows. (Same family as the traps in HANDOVER.md:
+    # a line that reads like verification and reports nothing.)
+    ver = importlib.metadata.version("presidio-analyzer")
     still_ignored = set(NerModelConfiguration().labels_to_ignore or [])
     print(f"  (presidio {ver}; library default still ignores ORG: "
           f"{'ORG' in still_ignored} -- overridden at runtime)")

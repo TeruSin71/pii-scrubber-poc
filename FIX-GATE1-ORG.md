@@ -75,6 +75,11 @@ no `REDACT_TYPES`, no `samples.json`, no `CUSTOM_OBJECT_RULE`, no
 | **2.2.357 (pinned) after fix** | **100.0** | **45/45** | **6** | **17/17** |
 | 2.2.364 after fix | 100.0 | 45/45 | 6 | — |
 
+> **Count corrected 2026-08-15:** the suite emits **16**, not 17. Verified
+> byte-identical to this commit; two checks added by the ORG fix took it
+> 14 -> 16. No check was lost. (The pre-fix row's `12/15` denominator is
+> likewise inconsistent with the same suite; not re-verified.)
+
 `over_detections` returning to **6** on the pinned stack independently
 confirms the diagnosis: the documented baseline is reproduced once ORG is
 restored.
@@ -84,6 +89,9 @@ restored.
 - **`test_fixes.py` Defect 4** — pins unsuffixed-ORG detection so this cannot
   silently regress; asserts the suffixed path still works; prints whether the
   installed library still ignores ORG. Now 17 checks.
+  *Count corrected 2026-08-15: the suite emits 16, not 17. Verified
+  byte-identical to this commit; two checks added by the ORG fix took it
+  14 -> 16. No check was lost.*
 - **Seed count corrected to 27** in the docs. You were right — the literal
   holds 27 tokens; `28` was a doc error.
 
@@ -93,6 +101,11 @@ restored.
 `test_fixes.py` **17/17** · `Allowlist loaded: 27 tokens` (correct until
 Task 2 populates the file) · new log line
 `ORG un-ignored at NLP layer (N labels still ignored)`.
+
+> **Count corrected 2026-08-15:** the suite emits **16**, not 17. Verified
+> byte-identical to this commit; two checks added by the ORG fix took it
+> 14 -> 16. No check was lost. A gate condition of 17/17 could never be
+> satisfied and sent a later session hunting a phantom regression.
 
 Findings 4 and 5 in your plan update are both correct and worth keeping —
 finding 5 (`ORG_NAME` undetectable) is now **fixed**, not merely documented.

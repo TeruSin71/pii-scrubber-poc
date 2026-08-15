@@ -72,7 +72,7 @@ Every task's requirements implicitly include this section. Copied in force from 
 
 **Ground-truth invariant:** `samples.json` — 13 samples, 45 labelled PII values (verified). Never modified.
 
-**Baseline status — ESTABLISHED on this machine 2026-08-15 (Task 1, post-ORG-fix).** `recall_pct: 100.0`, `expected_pii: 45`, `redacted: 45`, `missed: 0`, `over_detections: 6`, `redacting_spans_emitted: 51`, `test_fixes.py` 17/17, `Allowlist loaded: 27 tokens`. Reference file: `/tmp/selftest-local.json`. Tasks 2, 3 and 6 diff against this. It required the `labels_to_ignore` fix in `get_analyzer()` (open finding 5) — the pre-fix pinned stack scored 97.8 / over_detections 4.
+**Baseline status — ESTABLISHED on this machine 2026-08-15 (Task 1, post-ORG-fix).** `recall_pct: 100.0`, `expected_pii: 45`, `redacted: 45`, `missed: 0`, `over_detections: 6`, `redacting_spans_emitted: 51`, `test_fixes.py` 16/16, `Allowlist loaded: 27 tokens`. Reference file: `/tmp/selftest-local.json`. Tasks 2, 3 and 6 diff against this. It required the `labels_to_ignore` fix in `get_analyzer()` (open finding 5) — the pre-fix pinned stack scored 97.8 / over_detections 4.
 
 **Reporting cadence:** At each gate, the stated deliverable within the stated word limit, numbers verbatim from command output. On failure: the failing command, the actual error, one best hypothesis. Mid-task silence is fine. Blocked >20 minutes on one error → stop and report.
 
@@ -965,7 +965,7 @@ detection to make a test pass. Audited by diff: no threshold, recogniser,
 `REDACT_TYPES`, `CUSTOM_OBJECT_RULE`, `ZY_SURNAME_GUARD` or `samples.json` touched.
 
 Re-verified here on the pinned stack: `recall_pct 100.0` · `45/45` · `missed 0` ·
-`over_detections 6` · `redacting_spans_emitted 51` · `test_fixes.py` **17/17**. New log
+`over_detections 6` · `redacting_spans_emitted 51` · `test_fixes.py` **16/16**. New log
 line `ORG un-ignored at NLP layer (11 labels still ignored)`. Pinned against regression
 by `test_fixes.py` Defect 4.
 
