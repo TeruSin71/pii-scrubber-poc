@@ -157,11 +157,16 @@ Expected diff: `IDENTICAL` — the image ships the same allowlist the local run 
 > embedded credential**. Remote tree verified: **21 blobs, matching the 21 tracked
 > locally**, none of `.venv/`, `hfcache/`, `corpus/`, candidates or `.env`.
 >
-> ⛔ 4.4–4.6 **blocked — finding 12.** `docker login ghcr.io` **succeeded** (credentials
-> valid), but `docker push ghcr.io/terusin71/pii-scrubber:1.0.0` returned
-> `permission_denied: The token provided does not match expected scopes.` Evidence, not
-> inference. Unblock: user runs `gh auth refresh -s write:packages` (interactive browser
-> flow — cannot be done from this session), then 4.4–4.6 resume unchanged.
+> ✅ 4.4–4.6 **completed** after the user ran `gh auth refresh -s write:packages`
+> (finding 12 resolved). Image pushed to `ghcr.io/terusin71/pii-scrubber:1.0.0`,
+> digest `sha256:c57b92e7c16eee28d587f0217b7e85ca14fbdb29de1f6e15a33db3c46a5d3a6c`,
+> push digest and registry-resolved digest **match**, package **private**, manifest
+> retrieved back from the registry.
+>
+> ⛔ **4.6b FAILS — finding 13. The published image is `linux/arm64`; AI Core needs
+> `linux/amd64`.** Task 4's deliverable is nominally met and the artifact is genuinely
+> in the registry, but it is **not runnable on the target**. Task 6 would fail at pod
+> start. Requires an approved `--platform linux/amd64` rebuild before Task 6.
 >
 > **U4 remains open and now gates Task 5, not Task 4.** The repo decision was made
 > independently of it, so publishing code was unaffected. But Task 5's ServingTemplate
@@ -176,6 +181,7 @@ Standing authorization granted for this session; per-command sign-off waived. St
 - [ ] 4.4 Registry login via `--password-stdin` (never echo). A `ghcr.io` 403 usually means missing **Packages: write**, not bad auth.
 - [ ] 4.5 Tag + push image
 - [ ] 4.6 **Pull it back and confirm the digest** — proves AI Core can fetch it
+- [ ] 4.6b **Confirm the image platform is `linux/amd64`** — `docker buildx imagetools inspect <ref>` must list `linux/amd64`. A digest check alone **cannot** catch this: on an arm64 host, pulling an arm64 image round-trips perfectly and still cannot run on AI Core. Anything other than `linux/amd64` present is a **stop**. See finding 13.
 
 ⚠️ If the image lands in a **private `ghcr.io`** namespace, the Task 6 `docker-registry-secret` must target `https://ghcr.io`, not `https://index.docker.io` as the runbook example shows.
 
@@ -281,6 +287,26 @@ Stop and report rather than working around any of these:
 12. **The available GitHub credential lacks `write:packages`** — ⛔ **OPEN, blocks the `ghcr.io` push.** Checked before attempting anything remote, so this is a prediction rather than a post-mortem. `gh auth status` reports account **TeruSin71**, authenticated via keyring, token scopes **`gist`, `read:org`, `repo`** — no `write:packages`. Also on this machine: **no git remote** configured, **no** token-shaped environment variable present, and `~/.docker/config.json` has **no registry logins** (`credsStore: desktop`).
 
     U2 was answered "ghcr.io, PAT has Packages: write", but the credential actually reachable here does not have it. A `docker push ghcr.io/…` would 403 — which the runbook itself predicts is a scope problem, not an auth problem. Three ways out, all the user's call: re-run `gh auth refresh -s write:packages`, supply a separate classic PAT with `write:packages` via env at point of use, or switch to Docker Hub. Do not attempt the push until one is settled.
+
+    ✅ **RESOLVED 2026-08-15** — user ran `gh auth refresh -s write:packages`; scopes now `gist, read:org, repo, write:packages`. Push succeeded.
+
+13. **The published image is `linux/arm64`; AI Core runs `linux/amd64`** — ⛔ **OPEN, hard-blocks Task 6.** This machine is Apple Silicon (`uname -m` → `arm64`) and neither the `Dockerfile` nor any plan step specifies `--platform`, so `docker build` produced a native arm64 image and `docker push` published it as an OCI index containing **exactly one runnable platform: `linux/arm64`** (plus a buildkit attestation manifest, `unknown/unknown`, which is normal provenance and not a second platform).
+
+    ```
+    Manifests:
+      …@sha256:e4f2c1a2…  linux/arm64
+      …@sha256:ef5a660b…  unknown/unknown  (attestation-manifest)
+    ```
+
+    SAP AI Core executables run on x86_64 nodes. A KServe predictor pulling this image will fail to find a matching platform, or start and die with `exec format error`. Everything verified in Task 3 — recall, allowlist, the network-severed Rule 3 proof — was measured on the arm64 image and remains valid **as behaviour**, but not as an artifact AI Core can run.
+
+    **Fix (needs approval — it is a rebuild, and a slow one):**
+    ```bash
+    docker buildx build --platform linux/amd64 -t ghcr.io/terusin71/pii-scrubber:1.0.0 --push .
+    ```
+    Under QEMU emulation on arm64 this is substantially slower than the 19-minute native build — plan for 60–90 minutes, and it consumes another ~2.2 GB against ~16 GB free. Building natively on an amd64 host would be far cheaper if one is available. Re-running Task 3's in-container verification against the amd64 image is advisable but will itself be emulated and slow.
+
+    ⚠️ **Runbook gap that let this through.** Task 4 Step 6 says "pull it back and confirm the digest". On an arm64 host that check **passes** against an arm64 image — it confirms the artifact round-trips, not that it can run on the target. Amended below: verify **platform**, not just digest.
 4. **Bare `AnalyzerEngine()` downloads `en_core_web_lg`** — ⚠️ **OPEN, standing session rule.** Presidio's default model resolution fetches `lg` (400 MB) over the network. Found by causing it during Task 1 diagnosis; uninstalled, `['en_core_web_sm']` confirmed restored. **Never construct a bare `AnalyzerEngine()`** — mirror `app.py` (explicit `NlpEngineProvider` on `SPACY_MODEL`) or import `app.get_analyzer()`. Rule 3 hazard, not a style point. Repo audited: only `app.py:209`, which passes `nlp_engine` explicitly. Task 3.5b verifies the image.
 5. **`ORG_NAME` undetectable for suffix-less organisations** — ✅ **FIXED 2026-08-15** (`FIX-GATE1-ORG.md`). `presidio-analyzer==2.2.357` default `labels_to_ignore` contains `ORG`/`ORGANIZATION`, so spaCy's ORG label was dropped at the **NLP-engine layer, before any recognizer ran**; the only other path, `recognizers.py:102`, needs a legal suffix (GmbH/Ltd/…), which `Pacific Traders` lacks. `get_analyzer()` now rebuilds the ignore list from the installed default minus `ORG`/`ORGANIZATION` — reading installed values, so it is a no-op on 2.2.364. **This raises recall by restoring a suppressed detection path; it is the inverse of stop-condition 3, which forbids weakening detection.** Verified here: `100.0` / `45/45` / `over_detections 6`, log line `ORG un-ignored at NLP layer (11 labels still ignored)`. Pinned against regression by `test_fixes.py` Defect 4.
 
