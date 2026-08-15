@@ -350,7 +350,20 @@ Stop and report rather than working around any of these:
 
     **Consequences for the runbook:** Task 6 Step 1's "wait ~3 min then check the scenario" is still right, but its implicit assumption — that a sync problem would be *visible* — is wrong. Do not diagnose from the status panel. The scenario appearing under *ML Operations → Scenarios* is the only trustworthy evidence, and its absence after a couple of sync cycles points at the path before anything else.
 
-    ⚠️ **Two documents now carry a stale path** and were deliberately not edited here: `README-DEPLOY.html` §3 ("Edit `serving_template.yaml`… Commit it to the repo") and `VSCODE-PROMPT-pii-scrubber-deploy.md`, both of which imply the repo root. `README-DEPLOY.html` is the authorization document under Rule 1, so amending it is a separate, explicit decision rather than a side effect of this move — the same reasoning applied to its stale §7 GLiNER claim (finding 11). Flagged so the next reader does not restore the file to the root. This machine is Apple Silicon (`uname -m` → `arm64`) and neither the `Dockerfile` nor any plan step specifies `--platform`, so `docker build` produced a native arm64 image and `docker push` published it as an OCI index containing **exactly one runnable platform: `linux/arm64`** (plus a buildkit attestation manifest, `unknown/unknown`, which is normal provenance and not a second platform).
+    ⚠️ **Two documents now carry a stale path** and were deliberately not edited here: `README-DEPLOY.html` §3 ("Edit `serving_template.yaml`… Commit it to the repo") and `VSCODE-PROMPT-pii-scrubber-deploy.md`, both of which imply the repo root. `README-DEPLOY.html` is the authorization document under Rule 1, so amending it is a separate, explicit decision rather than a side effect of this move — the same reasoning applied to its stale §7 GLiNER claim (finding 11). Flagged so the next reader does not restore the file to the root.
+
+    **Second half of the sync fix (2026-08-15, commit `8a2166f`):** the path alone was not sufficient. Diffed against the template AI Core demonstrably accepts (`aicore-sandbox/workflows/serve-late-model.yaml`), two label changes were needed: **remove the `executables.ai.sap.com/id` label** (the `…/name` annotation stays) and **`ai.sap.com/version: "1.0"`**, not `"1.0.0"`. After both, the scenario synced and a Configuration + Deployment could be created. Knock-on: with the id label gone the executable is identified by `metadata.name`, so Configurations reference executable **`pii-scrubber`**, version **`1.0`**.
+
+15. **`docker-registry-secret` is not reaching ghcr.io — deployment blocked at image resolution** — ⛔ **OPEN, the last blocker.** Deployment `d455a957ca2e8dcb` reached PENDING with `RevisionFailed`:
+
+    ```
+    failed to resolve image to digest:
+    GET …/token?scope=repository:terusin71/pii-scrubber:pull … UNAUTHORIZED: authentication required
+    ```
+
+    (The `%!(MISSING)` sequences in the raw message are Go format-string mangling of URL-encoded `:` and `/` — decode before reading.) `RevisionMissing` and `IngressReady: False` are downstream of this one condition, not separate faults.
+
+    **Isolated by reproduction from outside BTP:** the identical token request anonymously → **401** (AI Core's exact error); with `TeruSin71` + PAT basic auth → **200** and the manifest fetch succeeds. So image, tag, visibility and PAT scope are all fine; the secret as stored in AI Core is not presenting a usable credential. Prime suspects, in order: secret keyed to `https://index.docker.io` (the runbook example's host) instead of `https://ghcr.io`; secret name not exactly `docker-registry-secret`; PAT pasted with whitespace or missing `read:packages`. KServe retries revision creation, so a corrected secret may unblock the existing deployment without recreating it. This machine is Apple Silicon (`uname -m` → `arm64`) and neither the `Dockerfile` nor any plan step specifies `--platform`, so `docker build` produced a native arm64 image and `docker push` published it as an OCI index containing **exactly one runnable platform: `linux/arm64`** (plus a buildkit attestation manifest, `unknown/unknown`, which is normal provenance and not a second platform).
 
     ```
     Manifests:
