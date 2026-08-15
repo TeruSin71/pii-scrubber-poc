@@ -64,6 +64,20 @@ ENV SCRUBBER_ENGINE=presidio \
     SPACY_MODEL=${SPACY_MODEL} \
     GLINER_THRESHOLD=0.4
 
+# Build identity, passed at build time:
+#   docker buildx build --build-arg BUILD_VERSION=1.2.1 ...
+#
+# Placed HERE, after every COPY, on purpose: an ENV invalidates every layer
+# below it, so an early placement would re-run pip and the spaCy download on
+# every version bump -- minutes of emulated build, for a string.
+#
+# The default is "dev" and must stay that way. A version-shaped default makes
+# an image built without --build-arg indistinguishable from a correct one,
+# which is precisely the incident this exists to prevent. Both properties are
+# asserted structurally by test_build_version.py.
+ARG BUILD_VERSION=dev
+ENV BUILD_VERSION=${BUILD_VERSION}
+
 EXPOSE 8080
 
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]

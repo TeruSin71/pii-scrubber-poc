@@ -106,6 +106,14 @@ ALLOWLIST_PATH = os.getenv("ALLOWLIST_PATH", str(Path(__file__).parent / "allowl
 # test_jargon.py.
 GLOSSARY_PATH = os.getenv("GLOSSARY_PATH", str(Path(__file__).parent / "glossary.txt"))
 
+# Baked at build time by the Dockerfile (ARG -> ENV) and read once here.
+# Default "dev" on purpose: an image built without --build-arg must be
+# VISIBLY wrong, not plausibly right. From the stale-deployment incident --
+# a script measured a live-but-stale deployment and reported confident
+# numbers for an artifact nothing in the response identified. Surfaced by
+# /info and /v1/selftest so every number carries the build that produced it.
+BUILD_VERSION = os.getenv("BUILD_VERSION", "dev")
+
 
 def _load_allowlist() -> set:
     tokens = {
@@ -189,7 +197,10 @@ ALLOWLIST = _load_allowlist()
 # Mixed-case entries (e.g. "IDoc") are matched as written.
 ALLOWLIST_EXACT = set(ALLOWLIST)
 
-app = FastAPI(title="PII Scrubber (POC)", version="1.0.0")
+# version= tracks the build, not a literal. It read "1.0.0" on every image
+# ever shipped, including the deployed 1.2.0 -- wrong information, not
+# missing information, and visible on /docs.
+app = FastAPI(title="PII Scrubber (POC)", version=BUILD_VERSION)
 
 _lock = threading.Lock()
 _analyzer = None
@@ -473,6 +484,7 @@ def health():
 @app.get("/info")
 def info():
     return {
+        "build_version": BUILD_VERSION,
         "engine": ENGINE,
         "gliner_model": GLINER_MODEL if ENGINE in ("gliner", "both") else None,
         "spacy_model": SPACY_MODEL,
@@ -575,6 +587,7 @@ def selftest():
     over_detected = max(0, total_redacting_spans - total_found)
 
     return {
+        "build_version": BUILD_VERSION,
         "engine": ENGINE,
         "samples_run": len(samples),
         "overall": {
