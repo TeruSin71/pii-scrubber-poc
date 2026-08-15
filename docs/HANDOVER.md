@@ -27,6 +27,82 @@ Two paths through the service:
 
 ---
 
+## ⏳ 1.2.3 — IN PROGRESS, NOT SHIPPED. Read this first.
+
+**7 commits exist locally and NONE is pushed.** The remote and the deployment
+are both at `1.2.2`, which is correct and running. Nothing here is live.
+
+```
+origin/deploy/aicore-poc  9734841   (1.2.2 close-out)
+local HEAD                2ca8c77   7 commits ahead, review-before-push in force
+deployment                da1b1b3e39367c59, running 1.2.2, healthy
+```
+
+| Item | State |
+|---|---|
+| 1 — `unmapped_labels()` reads the engine's real ignore list | ✅ built, `24eaef3` |
+| 2 — `unmapped_labels` surfaced on `/v1/info` | ✅ built, `3adaeaa` |
+| 3 — map `FAC` → `ADDRESS` | ⛔ **WITHDRAWN. It does nothing — see below** |
+| 4 (replacement) — correct three wrong descriptions | ⏸ **authorized, gated on Teru's confirmation of the scope change** |
+| 5 — regression gates | not started; gates must be **exact-zero movement** |
+| 6-8 — build, review gate, publish | not started |
+
+### ⛔ Why item 3 was withdrawn — the finding this release actually produced
+
+**`FAC` never reaches `LABEL_MAP`.** It is dropped a layer earlier:
+`SpacyRecognizer.supported_entities` is
+`['ORGANIZATION','LOCATION','AGE','EMAIL','PHONE_NUMBER','ID','PERSON','DATE_TIME','NRP']`
+— no `FAC` — so presidio emits no result and `analyze()` returns empty.
+Proved directly in the pinned container:
+
+```
+BEFORE  detect(): []
+AFTER FAC->ADDRESS in LABEL_MAP: []
+```
+
+The evidence that justified item 3 — an incidence probe finding `FAC` spans in
+the corpora, 4 then 8 — was measured with **raw spaCy**, not through the
+pipeline. Correct about spaCy, irrelevant to the scrubber. This is the new
+**"true measurement taken at the wrong layer"** trap class, recorded in the
+trap list below. Full record: `fac_probe_validation.md`.
+
+### Three descriptions are now known wrong (replacement Task 4)
+
+Docs and strings only. No behaviour change, no measurement moves.
+
+1. **The 1.2.2 startup warning** says unmapped labels are "DETECTED and then
+   silently dropped". For `FAC` the drop *precedes* detection.
+2. **This handover's trap-8 entry** says `FAC` "reaches `_norm()` raw". It
+   does not.
+3. **`unmapped_labels()` documented semantics** — it models `labels_to_ignore`
+   and the entity mapping but **not** `supported_entities`, so it
+   over-reports. Modelling `supported_entities` is deferred to the recognizer
+   plan; only the documentation is corrected now.
+
+### The leak class is real and still open
+
+Unnumbered street and facility references redact nothing — confirmed on five
+lines in the pinned container:
+
+```
+'the warehouse on Willis Street'   detect() = []
+'the depot on Great South Road'    detect() = []
+'Auckland International Airport'   detect() = []
+```
+
+**The correct layer is the recognizer, not `LABEL_MAP`.** Precedent exists:
+`get_analyzer()` already re-registers `SpacyRecognizer` with `ORGANIZATION`
+added, for the 1.2.0 ORG defect. Adding `FAC` is the analogous fix and is
+**materially larger than one line** — it needs its own plan, its own
+pre-registration, correct-layer incidence evidence, and the probe batch
+re-run against a FAC-registered build.
+
+⚠️ **`fac_probe_validation.md`'s "0 of 12 control fires" is NOT safety
+evidence for that change.** `FAC` could not fire on any line, so the controls
+were never exercised. The over-redaction risk is entirely unmeasured.
+
+---
+
 ## 1.2.2 — shipped, cut over, verified end to end (2026-08-16)
 
 | | |
@@ -560,9 +636,29 @@ refuses to suppress a pure-alpha token when user-context words ("posted by",
 
 ## How to resume
 
+**Start here if you are picking up 1.2.3 (the open work):**
+
+- **`docs/superpowers/plans/2026-08-16-pii-scrubber-1.2.3-bundle.md`** — the
+  live plan. §5 is the pre-registration (all gates exact, nothing moves), §4
+  holds the answered Gate-0 questions, Appendix A holds the FAC evidence and
+  the 4→8 correction. **Item 3 in that plan is withdrawn**; the top of this
+  handover says why.
+- **`fac_probe_validation.md`** — the Task 3 record and the finding that
+  withdrew item 3. Read the vacuity note before reusing any of its numbers.
+- **`fac_probe_samples.json`** — the probe batch. Committed on purpose:
+  burned sets are hidden because visibility destroys them, a development
+  verification set is committed because visibility is its purpose.
+- **The immediate next action** is replacement Task 4 (three description
+  corrections, docs and strings only), which is **gated on Teru confirming
+  the release scope change**: 1.2.3 = items 1-2 + corrections, item 3 gone.
+  Then Task 5 gates at exact-zero movement, then build, then the review gate,
+  then publish. **Nothing is pushed until the review gate.**
+
+**Historical, for context:**
+
 1. `docs/superpowers/plans/2026-08-15-pii-scrubber-task-list.md` — the run
-   sheet, **closed at Gate 5 on 2026-08-16.** Three releases verified live;
-   all 18 findings in full.
+   sheet. Closed at Gate 5, then reopened and re-closed twice for 1.2.1 and
+   1.2.2. Three releases verified live; all 18 findings in full.
 2. `docs/superpowers/plans/2026-08-15-pii-scrubber-1.2.0-bundle.md` — the
    two-item bundle: plan, decisions, risk register, and Appendix A's glossary
    rejections with the reason each was refused.
@@ -671,8 +767,18 @@ account with finite free-tier quota.
 ```bash
 source .venv/bin/activate
 
-python test_fixes.py          # 16/16 — the three fixed defect classes + recall invariant
-python test_address.py        # street-address recognizer, positives and negatives
+# Six suites. The counts are the baseline -- a change in ANY of them is
+# reportable, in either direction.
+python test_fixes.py            # 16  three fixed defect classes + recall invariant
+python test_address.py          # 39  street-address recognizer, both directions
+python test_customer_number.py  # 33  cue-gated lookbehind patterns
+python test_jargon.py           # 74  glossary: suppression under the context backstop
+python test_build_version.py    # 22  build identity, /v1/info, gateway-reachable routes
+python test_label_map.py        # 23  unmapped-label diagnostic + its failure isolation
+
+# The four burned gates, all exact. Any movement either way is a stop.
+#   holdout_samples.json  108/111   eval_samples_v2.json  65/68
+#   holdout_v3.json        45/50    /v1/selftest          45/45, over_detections 4
 
 # against the deployment (DEPLOYMENT_ID defaults to da1b1b3e39367c59)
 export AI_API=... TOKEN=...
