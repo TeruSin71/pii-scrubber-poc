@@ -42,10 +42,22 @@ print("Service reports its build")
 check("BUILD_VERSION exists and is a non-empty string",
       isinstance(BV, str) and BV != "",
       f"got {BV if BV is not MISSING else '<attribute absent>'!r}")
-check("default is 'dev' when the env var is unset",
-      BV is not MISSING and BV == os.getenv("BUILD_VERSION", "dev"),
+check("default is 'dev' when the env var is unset OR empty",
+      BV is not MISSING and BV == (os.getenv("BUILD_VERSION") or "dev"),
       f"env={os.getenv('BUILD_VERSION')!r} constant="
       f"{BV if BV is not MISSING else '<attribute absent>'!r}")
+
+# An empty BUILD_VERSION must fall back, not propagate. FastAPI asserts a
+# truthy version when it builds the OpenAPI schema, so `--build-arg
+# BUILD_VERSION=` on the two-arg os.getenv form stopped the service booting
+# (exit 1, AssertionError). Asserted at source because reproducing it needs a
+# subprocess and a full allowlist load for one string.
+src = [l for l in open("app.py").read().splitlines()
+       if l.startswith("BUILD_VERSION =")]
+check("BUILD_VERSION uses the `or` fallback, not a two-arg default",
+      src and src[0].strip() == 'BUILD_VERSION = os.getenv("BUILD_VERSION") or "dev"',
+      f"found: {src[0].strip() if src else '<no assignment found>'!r} -- the "
+      "two-arg form returns '' for an empty env var and FastAPI refuses to start")
 check("FastAPI app version tracks the build, not a hardcoded string",
       BV is not MISSING and A.app.version == BV,
       f"app.version={A.app.version!r} BUILD_VERSION="

@@ -61,6 +61,17 @@ def main() -> int:
         headers["Authorization"] = f"Bearer {token}"
         headers["AI-Resource-Group"] = "default"
 
+    # Stamp the artifact these numbers came from. Pre-1.2.1 images have no
+    # build_version -- say so and carry on rather than aborting, because the
+    # 1.2.0 and 1.1.0 rollback images must stay measurable.
+    info_url = url.rsplit("/v1/scrub", 1)[0] + "/info"
+    try:
+        with urllib.request.urlopen(
+                urllib.request.Request(info_url, headers=headers), timeout=30) as r:
+            build = json.load(r).get("build_version") or "unknown (pre-1.2.1 image)"
+    except Exception as e:  # noqa: BLE001 -- identity is advisory, never fatal
+        build = f"unreachable ({type(e).__name__})"
+
     per_type = defaultdict(lambda: {"expected": 0, "caught": 0})
     leaks = []
     control_notes = []
@@ -106,12 +117,19 @@ def main() -> int:
     print(" " * 40, end="\r")
 
     print("=" * 62)
-    print("HOLDOUT RESULT — deployed scrubber, unseen data")
+    # NOT "HOLDOUT RESULT". This harness scores whatever file it is handed,
+    # and it printed that banner for every one of them -- run against
+    # eval_samples_v2.json it announced a holdout result for a set that is
+    # explicitly not a holdout. The caller names the set; the harness never
+    # does. Same trap class as the version string this release added.
+    print("SCRUBBER EVALUATION — one scorer, caller names the set")
     print("=" * 62)
     recall = 100.0 * total_caught / total_expected if total_expected else 0.0
+    print(f"build: {build}   samples: {path}")
+    print(f"target: {url}")
     print(f"samples: {len(samples)}   planted PII: {total_expected}   "
           f"caught: {total_caught}   LEAKED: {total_expected - total_caught}")
-    print(f"HOLDOUT RECALL: {recall:.1f}%   ({dt:.0f}s total)")
+    print(f"RECALL: {recall:.1f}%   ({dt:.0f}s total)")
     print()
     print(f"{'TYPE':<13}{'EXPECT':>8}{'CAUGHT':>8}{'RECALL%':>9}")
     for t in sorted(per_type):

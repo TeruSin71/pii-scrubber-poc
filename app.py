@@ -112,7 +112,16 @@ GLOSSARY_PATH = os.getenv("GLOSSARY_PATH", str(Path(__file__).parent / "glossary
 # a script measured a live-but-stale deployment and reported confident
 # numbers for an artifact nothing in the response identified. Surfaced by
 # /info and /v1/selftest so every number carries the build that produced it.
-BUILD_VERSION = os.getenv("BUILD_VERSION", "dev")
+#
+# `or "dev"`, NOT os.getenv(..., "dev"): the two-arg form returns "" when the
+# variable is set but empty, and FastAPI asserts a truthy version when it
+# builds the OpenAPI schema --
+#   AssertionError: A version must be provided for OpenAPI, e.g.: '2.1.0'
+# -- so `--build-arg BUILD_VERSION=` would not mislabel the service, it would
+# stop it booting. On a 1-pod tier where an admission-rejected revision is
+# permanent, that is a far worse failure than a wrong string. Measured, not
+# theorised: the empty-value service exited 1 at startup.
+BUILD_VERSION = os.getenv("BUILD_VERSION") or "dev"
 
 
 def _load_allowlist() -> set:
