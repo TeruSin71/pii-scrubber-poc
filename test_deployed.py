@@ -9,8 +9,12 @@ the scrubbed output. That is the honest production-shaped number.
 
 Usage (same terminal where $AI_API and $TOKEN are set):
 
-    export DEPLOYMENT_ID=d321900053823717
+    export DEPLOYMENT_ID=d5e6ea76217ed207
     python3 test_deployed.py holdout_samples.json
+
+Or against a local service, with the same scorer:
+
+    SCRUB_URL=http://localhost:8080/v1/scrub python3 test_deployed.py holdout_samples.json
 
 No dependencies beyond the standard library.
 Scoring: a value counts as CAUGHT only if the (whitespace-normalised,
@@ -36,7 +40,7 @@ def norm(s: str) -> str:
 def main() -> int:
     ai_api = os.environ.get("AI_API")
     token = os.environ.get("TOKEN")
-    dep = os.environ.get("DEPLOYMENT_ID", "d321900053823717")
+    dep = os.environ.get("DEPLOYMENT_ID", "d5e6ea76217ed207")
     # Point at a local service instead of the deployment, for pre-deploy
     # verification:  SCRUB_URL=http://localhost:8080/v1/scrub
     # Unset -> deployed behaviour below, unchanged. Deliberately one scorer for
