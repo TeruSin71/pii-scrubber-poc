@@ -42,9 +42,24 @@ COPY app.py recognizers.py samples.json allowlist.txt glossary.txt ./
 # AI Core / KServe may run the container as a non-root UID.
 RUN chmod -R 777 /app
 
-# Start in presidio-only mode: proves the deployment cheaply on the
-# free-tier 'starter' plan. Flip to 'both' in the AI Core configuration
-# to bring GLiNER online -- no rebuild needed.
+# Presidio-only. This is not a starting point -- it is the only mode that runs.
+#
+# This comment previously read "Flip to 'both' in the AI Core configuration to
+# bring GLiNER online -- no rebuild needed." That is FALSE and it is finding 11:
+# gliner==0.2.16 is incompatible with the huggingface_hub version pip resolves,
+# so GLiNER.from_pretrained raises
+#
+#   TypeError: GLiNER._from_pretrained() missing 2 required keyword-only
+#   arguments: 'proxies' and 'resume_download'
+#
+# get_gliner() calls exactly that at runtime, so setting engine=both takes the
+# deployment down -- and the prefetch above fails too, so no weights are baked
+# in either. Enabling GLiNER needs a huggingface_hub pin (Rule 7, needs
+# approval) and a rebuild. Owner: the GLiNER bake-off session.
+#
+# The same false claim was corrected in README-DEPLOY.html s7 by a9bed3e; this
+# copy was missed. Comments produce no layers, so this edit does not change the
+# tested image.
 ENV SCRUBBER_ENGINE=presidio \
     SPACY_MODEL=${SPACY_MODEL} \
     GLINER_THRESHOLD=0.4
