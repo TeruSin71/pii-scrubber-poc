@@ -6,26 +6,42 @@ Generative AI Hub, no third-party LLM ever sees raw data.
 
 ## Verified result
 
-**Quote the holdout number, not the self-test number.**
+**Quote 90.0%.** It is the only figure measured on data the build never saw.
 
-### Holdout — 40 unseen samples, 111 planted values
+### Blind batch — 40 samples, 50 planted values
 
-The honest figure. These samples were never used to tune the recognizers, and
-scoring is end to end: a value counts as caught only if it no longer appears
-in the scrubbed output.
+Authored outside the build session, never seen before the run, run **once**
+against the deployed image. Scoring is end to end: a value counts as caught
+only if it no longer appears in the scrubbed output.
 
 | Metric | Value |
 |---|---|
-| **Holdout recall** | **96.4%** (107 / 111) |
-| Leaks | 4 — see "Known gaps" |
-| Measured on | deployed image `1.1.0`, SAP AI Core |
+| **Blind recall** | **90.0%** (45 / 50) |
+| Leaks | 5 — **zero novel failure classes** |
+| Measured on | deployed `1.2.0`, deployment `db3d9cc5eea296cd` |
 
-Per type: ADDRESS, EMAIL, IBAN, IP_ADDRESS, ORG_NAME, PHONE, USER_ID and
-VENDOR_NO all **100%**; PERSON 89.3% (25/28); CUSTOMER_NO 85.7% (6/7).
+**Every one of the five leaks was already documented before the run.** Three
+are the known PERSON classes; two are unpadded customer numbers sitting behind
+`client` and `ship-to`, cues deliberately left out of the frozen cue list —
+they leaked exactly as that design decision predicted. Nothing failed in a way
+the team had not already written down.
 
-> Superseded: **93.7%** (104/111) was the pre-fix baseline, measured before
-> the street-address recognizer existed. It is kept here only as the
-> before-figure — do not quote it as current.
+Notable positives: ADDRESS **7/7**, including all five street types that were
+safety-cleared but unshipped; PHONE **8/8**, including the first AU and GB
+numbers ever tested.
+
+### Regression suite — 40 samples, 111 values
+
+| Metric | Value |
+|---|---|
+| Recall | 97.3% (108 / 111) |
+| Leaks | 3 — `ZHANG`, `Young`, `Mere Tuhoe` |
+
+> **This is a regression suite, not a blind figure.** It was the original
+> benchmark and read 96.4% on `1.1.0`, but the 1.2.0 work was built against
+> its leaks, so it can no longer measure what it shaped. Its job now is to
+> fail loudly if a change breaks something — any value other than 108/111 is
+> a stop. **Do not quote it as a production estimate.**
 
 ### Self-test — 13 tuned-against samples
 
@@ -33,7 +49,7 @@ VENDOR_NO all **100%**; PERSON 89.3% (25/28); CUSTOMER_NO 85.7% (6/7).
 |---|---|
 | Recall | 100% (45/45) |
 | Misses | 0 |
-| Over-detections | 6 (safe-but-noisy) |
+| Over-detections | 4 (safe-but-noisy) |
 | Engine | `presidio` + custom SAP recognizers |
 
 > This is a **regression baseline, not a result.** The recognizers were tuned
@@ -44,19 +60,23 @@ VENDOR_NO all **100%**; PERSON 89.3% (25/28); CUSTOMER_NO 85.7% (6/7).
 
 ### Known gaps
 
-Four values leak on the holdout, in three classes, none yet addressed:
+Two classes, both documented before the blind run confirmed them:
 
-| Class | Example | Note |
+| Class | Blind examples | Note |
 |---|---|---|
-| All-caps / bare surname | `ZHANG`, `Young` | person-context promotion |
-| Full name missed by NER | `Mere Tuhoe` | a plain spaCy miss, not a context problem |
-| Unpadded customer number | `1045567` | keyed without leading zeros |
+| PERSON, per-token | `NAKAMURA`, `Park`, `Adeyemi` | **A per-token lottery, not a frame problem.** `VERMEULEN` was caught in the *identical* sentence frame `NAKAMURA` leaked from — confirmed on a third dataset. Not fixable at the spaCy layer; both models fail, merely on different tokens. An engine-level question. |
+| Customer number, uncued | `5591230`, `6620945` | Behind `client` and `ship-to`. The cue list is frozen at six words; `ship-to` was excluded deliberately because in delivery text it cues an address more often than an account. These leak by design, not by defect. |
 
 Address coverage is **NZ/AU forms only**. German-style
 `Hauptstrasse 12, 80331 Munich` (name before number) is not matched by the
-recognizer and relies on incidental locality detection. A bare ambiguous-type
-address with no suburb (`44 Bellbird Rise`) is also missed — see
-`recognizers.py` for why that trade was made.
+recognizer and relies on incidental locality detection — which does work: both
+German forms tested were redacted end to end. A bare ambiguous-type address
+with no suburb (`44 Bellbird Rise`) is missed — see `recognizers.py` for why
+that trade was made.
+
+**A scrubber at 90% is a filter, not a guarantee.** The residual is what the
+human review gate exists to catch, and the glossary is bounded by the corpora
+it was mined from — production jargon outside them needs edit-and-redeploy.
 
 ## Quick start
 

@@ -432,8 +432,24 @@ Stop and report rather than working around any of these:
 
 ## Session log
 
+> **CLOSED 2026-08-16 at Gate 5.** Three releases verified live: `1.0.0`,
+> `1.1.0`, `1.2.0`. Final state — **97.3%** on the original benchmark, now
+> demoted to a regression suite; **90.0% blind** (45/50) on a batch authored
+> outside the build session and run once; deployment **`db3d9cc5eea296cd`**.
+>
+> The blind batch found **zero novel failure classes**. Every one of the five
+> leaks was already written down before it ran — three PERSON tokens and two
+> customer numbers behind cues deliberately left out of the frozen list. That
+> is the result worth carrying: not the 90, but that the gap between what the
+> team believed and what the artifact did was empty.
+>
+> Work continues in 1.2.1: `BUILD_VERSION` first, then eight glossary entries.
+
 | Date | Task | Gate | Result |
 |---|---|---|---|
+| 2026-08-16 | Gate 5 | 5 ✅ | **Blind batch, `holdout_v3.json`, 40 samples / 50 values, run once against `db3d9cc5eea296cd`: 90.0% (45/50), zero novel classes.** Leaks: `NAKAMURA` / `Park` / `Adeyemi` (PERSON, per-token) and `5591230` / `6620945` behind `client` / `ship-to` — both cue-list bounds, `ship-to` excluded by design. **Per-token lottery confirmed on a third dataset:** `VERMEULEN` caught in the identical frame `NAKAMURA` leaked from, which closes the model-size argument. ADDRESS **7/7** including all five Appendix-A street types in real addresses; PHONE **8/8** including first-ever AU and GB; `WAGNER` held against the allowlist; `AADEYEMI2` caught but typed `ORG_NAME` (redacted, mistyped, log only). Docs updated, `DEPLOYMENT_ID` default repointed, 1.2.1 backlogged. HTML reports not touched — already updated |
+| 2026-08-15 | 1.2.0 bundle | — | **Shipped two items, dropped one.** Customer-number fix (twelve cue-gated lookbehind patterns) and jargon glossary (29 evidence-derived entries). `en_core_web_lg` built, measured and **dropped**: net zero across both sets (173/179 either way), two new ORG regressions, 433 MB and 2.2× RSS. Image `sha256:e8a44575…81ca893`, `linux/amd64`, 460 MiB under a 3 GB cap. `over_detections` 6 → **4**, itemised before the baseline was re-asserted |
+| 2026-08-15 | person promoter | — | ⛔ **Negative result, reverted not shipped.** Fired zero times on 40 samples. Reaches ~1/3 of the residual PERSON class; the rest needs POS/dependency parsing. `PERSON-CONTEXT-FINDING.md`. Also exposed the spec-to-implementation narrowing failure mode: 24 green tests written from the same model of a cue that produced the cue list |
 | 2026-08-15 | Pre-flight | — | Repo read, plan written, `app.py` + `ALLOWLIST-EXTRACTION.md` updated, plan rewritten and resequenced |
 | 2026-08-15 | Pre-flight | — | `mine_allowlist.py` added; DD03L dropped; U6 answered (TSTC + DD02L in hand); candidates-merge defect found and mitigated in Task 2.3b |
 | 2026-08-15 | Pre-flight | — | Fix drop applied (`FIXES-2026-08-15.md` + `test_fixes.py`): all 3 findings fixed at source. Task 2.6 resolved as Option A; finding 1 closed, 2 downgraded; Task 1 gains `test_fixes.py` step. Statically verified here; runtime 15/15 pending Task 1 |

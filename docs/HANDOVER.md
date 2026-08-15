@@ -31,29 +31,39 @@ Two paths through the service:
 
 | Area | State |
 |---|---|
-| Deployment | ✅ **RUNNING** — `d5e6ea76217ed207` on SAP AI Core |
-| Image | ✅ `ghcr.io/terusin71/pii-scrubber:1.1.0`, **linux/amd64**, `sha256:070dea2c…f38290` |
+| Deployment | ✅ **RUNNING** — `db3d9cc5eea296cd` on SAP AI Core |
+| Image | ✅ `ghcr.io/terusin71/pii-scrubber:1.2.0`, **linux/amd64**, `sha256:e8a44575…81ca893` |
 | GitHub | ✅ `https://github.com/TeruSin71/pii-scrubber-poc` — **private**, branch `deploy/aicore-poc` |
 | AI Core Git sync | ✅ application `pii-scrubber-app` → repo `pii-scrubber-poc`, **path `workflows`**, revision `deploy/aicore-poc` |
 | Scenario | ✅ `pii-scrubber`, version `1.0`, executable `pii-scrubber` |
-| Allowlist | ✅ 257,578 tokens from `TSTC` + `DD02L` (service logs `Allowlist loaded: 257583`) |
-| Holdout evaluation | ✅ 40 unseen samples, **96.4%** recall |
+| Allowlist | ✅ 257,583 tokens (`TSTC` + `DD02L`) **+ 28 glossary entries** = 257,611 |
+| **Blind batch** | ✅ 40 samples / 50 values, **90.0%**, **zero novel failure classes** |
+| Regression suite | ✅ 108/111 (97.3%) — a gate, **not** a quotable figure |
 | Engine | `presidio` only. **`both` is broken — see finding 11.** |
 
-Rollback image, still in the registry: `1.0.0` (`sha256:8e779fde…f026a1b`) —
-identical except it lacks the street-address recognizer.
+Rollback images, both still in the registry:
+
+- `1.1.0` (`sha256:070dea2c…f38290`) — customer-number fix and glossary absent
+- `1.0.0` (`sha256:8e779fde…f026a1b`) — also lacks the street-address recognizer
+
+⚠️ **The deployment ID changed with 1.2.0.** `d5e6ea76217ed207` was 1.1.0 and
+no longer exists. `test_deployed.py` now defaults to `db3d9cc5eea296cd`. If a
+script points at the old ID it will fail, and — worse — a script pointing at a
+*stale but live* deployment reports confident numbers for the wrong artifact.
+That is the incident behind backlog item 1 for 1.2.1 (`BUILD_VERSION`).
 
 ---
 
 ## The numbers, and which one to quote
 
-**Quote 96.4%. Never quote 100%.**
+**Quote 90.0%. Never quote 100%. Never quote 97.3% either — see below.**
 
 | Measurement | Value | What it means |
 |---|---|---|
-| **Holdout** — 40 unseen samples, 111 planted values | **96.4%** (107/111) | The honest production-shaped estimate. These samples were never used for tuning. |
+| **Blind batch** — 40 samples, 50 values, `holdout_v3.json` | **90.0%** (45/50) | **The quotable figure.** Authored outside the build session, unseen before the run, run **once** against deployed `1.2.0`. **Zero novel failure classes** — all five leaks were documented before the run. |
+| Regression suite — 40 samples, 111 values, `holdout_samples.json` | 97.3% (108/111) | **Burned. A gate, not a measurement.** It read 96.4% on `1.1.0` and was the honest figure then; the 1.2.0 work was built against its leaks, so it can no longer measure what it shaped. Any value but 108/111 is a stop. |
+| Verification batch v2 — 65 samples, 68 values | 95.6% (65/68) | Also burned, same reason. Gate value: exactly 65/68. |
 | Self-test — 13 samples, 45 values | 100.0% (45/45) | A **regression baseline, not a result.** The recognizers were tuned against these 13 samples, so 100% is near-guaranteed. |
-| Verification batch v2 — 65 samples, 68 values | 92.6% (63/68) | **Not comparable to 96.4% and not a substitute for it.** Synthetic, Claude-authored 2026-08-15, deliberately weighted toward documented gaps and the thin types. A lower number here is the design working. `eval_samples_v2.json`, gitignored. |
 
 The self-test's job is to prove that packaging, rebuilding and deploying did not
 degrade detection. It is asserted, not targeted: if `/v1/selftest` returns below
@@ -61,11 +71,42 @@ degrade detection. It is asserted, not targeted: if `/v1/selftest` returns below
 a threshold, deleting a recognizer, relaxing `REDACT_TYPES`, or editing
 `samples.json` to make output match are all forbidden.
 
-`over_detections: 6` on the self-test is stable and expected.
+`over_detections: 4` on the self-test is the asserted baseline from 1.2.0
+(down from 6 — the glossary removed `IBAN` and one `PO`). Itemised in the
+`f2064f3` commit message. It is asserted, so a change in either direction is
+reportable.
 
 **Do not present 100% to management.** That instruction is in
 `README-DEPLOY.html`, `README.md` and the evaluation report, and it exists
 because the figure describes how well the rules fit their own training data.
+
+### What the blind batch actually found — 2026-08-16
+
+The point of the run was never the number; it was whether anything failed in a
+way nobody had written down. **Nothing did.**
+
+| Leak | Class | Status before the run |
+|---|---|---|
+| `NAKAMURA`, `Park`, `Adeyemi` | PERSON, per-token | documented |
+| `5591230` behind `client` | cue not in the frozen list | documented design decision |
+| `6620945` behind `ship-to` | cue **deliberately excluded** | documented design decision |
+
+`ship-to` was left out of the cue list on purpose: in delivery text it cues an
+address more often than an account. That value leaked exactly as predicted —
+the design was not wrong, it was **bounded**, and the blind batch found the
+boundary where it was drawn.
+
+**The per-token lottery is now confirmed on a third dataset.** `VERMEULEN` was
+caught in the *identical sentence frame* that `NAKAMURA` leaked from. Same
+frame, same shape, opposite outcome. This is what closes the model-size
+argument for good: it is not frames, it is tokens, and a bigger spaCy model
+only relocates which tokens lose.
+
+Positives worth keeping: **ADDRESS 7/7**, including all five street types that
+were safety-cleared but left unshipped — they behave correctly in real
+addresses, exactly as Appendix A predicted. **PHONE 8/8**, including the first
+AU and GB numbers ever tested. `WAGNER` held against the allowlist. `AADEYEMI2`
+was caught but typed `ORG_NAME` — redacted, mistyped, log only.
 
 ---
 
@@ -364,21 +405,67 @@ refuses to suppress a pure-alpha token when user-context words ("posted by",
 ## How to resume
 
 1. `docs/superpowers/plans/2026-08-15-pii-scrubber-task-list.md` — the run
-   sheet. Tasks 0–6 all complete; all 18 findings in full.
-2. `docs/superpowers/plans/2026-08-15-pii-scrubber-aicore-deployment.md` — the
+   sheet, **closed at Gate 5 on 2026-08-16.** Three releases verified live;
+   all 18 findings in full.
+2. `docs/superpowers/plans/2026-08-15-pii-scrubber-1.2.0-bundle.md` — the
+   two-item bundle: plan, decisions, risk register, and Appendix A's glossary
+   rejections with the reason each was refused.
+3. `docs/superpowers/plans/2026-08-15-pii-scrubber-aicore-deployment.md` — the
    detailed runbook, commands and rollbacks.
-3. `holdout-evaluation-report.html` — the 96.4% measurement and the backlog
-   (gitignored, local only).
-4. `VSCODE-PROMPT-address-recognizer.md` — the prompt that produced the address
-   work; a good template for the remaining backlog items.
-5. `PERSON-CONTEXT-FINDING.md` — why the rule-based person promoter was built
+4. `holdout_v3.json` — **the blind batch, 90.0%.** Authored outside the build
+   session, run once against `db3d9cc5eea296cd`, now burned and readable.
+   Gitignored — keep it that way. Its successor must also be authored
+   externally; a batch this session can see before the run is not blind.
+5. The two HTML reports — current as of Gate 5, gitignored, local only.
+6. `PERSON-CONTEXT-FINDING.md` — why the rule-based person promoter was built
    and then **not shipped**. Read before touching the PERSON class.
-6. `eval_samples_v2.json` — 65-sample synthetic verification batch, gitignored
+7. `VSCODE-PROMPT-address-recognizer.md` — the prompt that produced the address
+   work; a good template for the remaining backlog items.
+8. `eval_samples_v2.json` — 65-sample synthetic verification batch, gitignored
    and local only. Scored by the same harness:
    `SCRUB_URL=http://localhost:8080/v1/scrub python3 test_deployed.py eval_samples_v2.json`.
    Read its `_provenance` block before quoting anything from it; each
    gap-targeting sample carries a `note` field explaining what it probes, and
    that field is never sent to the service.
+
+## Next release — 1.2.1, scoped and evidenced
+
+Both items below were found during 1.2.0 work but land in 1.2.1. Scope stayed
+frozen at two items; these were **not** smuggled in.
+
+**1. `BUILD_VERSION` in the image, echoed by `/v1/selftest`.** From the
+stale-deployment incident: a script pointed at a deployment that was live but
+not the one just shipped, and reported confident numbers for the wrong
+artifact. Nothing in the response identifies which build answered. Bake a
+version string at build time and return it in the selftest payload, so every
+number carries its artifact. This is item 1 because it makes every other
+measurement auditable.
+
+**2. Eight glossary entries, all observed misfiring on the SHIPPED config.**
+The shipping rule is "observed misfire on the shipped config", and these now
+meet it — unlike `SH` and `ES_SD_REBATE`, which only misfired under `lg` and
+stay out.
+
+| Token | Reason | Evidence |
+|---|---|---|
+| `GL` | module | general ledger, mis-tagged on the blind batch |
+| `FX` | module | foreign exchange |
+| `WM` | module | warehouse management |
+| `MDG` | module | master data governance |
+| `MRP` | module | material requirements planning |
+| `OSS` | module | SAP support portal shorthand |
+| `CFO` | role | role acronym, not a person |
+| `Rise` | process | **mid-sentence**, in "the Rise in failed deliveries" |
+
+`Rise` is the interesting one. It was safety-cleared in Appendix A of the
+1.2.0 plan but left unshipped for want of an observed misfire — and the blind
+batch produced exactly that, in a sentence where `Rise` is an ordinary noun
+rather than a street type. **The clearance and the evidence now pair up**,
+which is precisely how that protocol was designed to work: prove it safe when
+you first meet it, ship it when an incident asks for it.
+
+Adding all eight is a data-only change to `glossary.txt`, but it is still a
+rebuild and a stop/create cycle on a 1-pod tenant. Bundle them.
 
 **Backlog, roughly in value order:**
 
@@ -386,12 +473,13 @@ refuses to suppress a pure-alpha token when user-context words ("posted by",
 |---|---|---|
 | ~~P1~~ | ~~street addresses~~ | ✅ **closed 2026-08-15** — 0/3 → 3/3 |
 | ~~P2~~ | ~~person-context promoter~~ | ⛔ **closed 2026-08-15 as a negative result** — built, measured, reverted. Reaches ~1/3 of the residual PERSON class. `PERSON-CONTEXT-FINDING.md` |
-| P2 | unpadded customer number | `1045567`, plus `2298871` and `4471902` from the v2 batch — 3 data points now. **Not a scoring problem:** `sap_customer_padded` is `\b000\d{7}\b` and `sap_customer_ctx` is `\b\d{10}\b`, both requiring 10 digits, and every unpadded value has 7 — nothing matches, so there is no score to raise. (An earlier note here claimed "0.35 against a 0.50 floor"; that was wrong.) Self-contained; **the only remaining leak class that rules can close** |
-| P3 | SAP jargon glossary | the `<ORG_NAME>` over-redaction class — now known to include module and role nouns (`Basis`, `Driver`), not only street types |
+| ~~P2~~ | ~~unpadded customer number~~ | ✅ **shipped in 1.2.0** — twelve cue-gated lookbehind patterns. Blind batch confirmed the *bound*, not a defect: `5591230` behind `client` and `6620945` behind `ship-to` leak because those cues are outside the frozen list, `ship-to` deliberately so. Widening the list is a live option, and `client` is the strongest candidate |
+| ~~P3~~ | ~~SAP jargon glossary~~ | ✅ **shipped in 1.2.0** — 29 evidence-derived entries. 8 more queued for 1.2.1 above |
 | ~~P2~~ | ~~`en_core_web_lg` upgrade~~ | ⛔ **CLOSED 2026-08-15, not deferred.** Measured net zero (173/179 either way), two new ORG regressions, 433 MB and 2.2× RSS. The residual class is an engine-level question, not a model-size one — see the finding above |
 | P3 | `LABEL_MAP` unknown-label warning | latent defect: unmapped entity labels are dropped silently and leak. One-liner at startup. Trap 8 |
-| ~~—~~ | ~~expand the sample set to 50–100~~ | ✅ **done 2026-08-15** — `eval_samples_v2.json`, 65 samples / 68 values, 92.6%. Synthetic and Claude-authored, so it supplements the blind holdout rather than replacing it. **Still worth replacing with real anonymised ticket shapes when they exist** |
-| — | GLiNER bake-off | blocked on finding 11 |
+| ~~—~~ | ~~expand the sample set to 50–100~~ | ✅ **done 2026-08-15** — `eval_samples_v2.json`, 65/68. Synthetic and Claude-authored; now burned as a gate at exactly 65/68 |
+| — | GLiNER bake-off / Local LLM | **the only open route for the residual PERSON class.** Blocked on finding 11. Not a model-size question — the per-token lottery is confirmed on three datasets |
+| — | real anonymised ticket shapes | every evaluation set to date is synthetic. The blind batch removed the *authorship* bias, not the *synthetic* one |
 
 Every task ends at an approval gate with a stated deliverable and word limit.
 Do not chain phases unattended — this runs against a shared corporate BTP
@@ -424,7 +512,7 @@ source .venv/bin/activate
 python test_fixes.py          # 16/16 — the three fixed defect classes + recall invariant
 python test_address.py        # street-address recognizer, positives and negatives
 
-# against the deployment (DEPLOYMENT_ID defaults to d5e6ea76217ed207)
+# against the deployment (DEPLOYMENT_ID defaults to db3d9cc5eea296cd)
 export AI_API=... TOKEN=...
 python3 test_deployed.py holdout_samples.json
 
