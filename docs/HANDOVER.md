@@ -27,55 +27,64 @@ Two paths through the service:
 
 ---
 
-## 1.2.1 — shipped, cut over, verified end to end (2026-08-16)
+## 1.2.2 — cut over 2026-08-16, deployed check NOT YET READ
 
 | | |
 |---|---|
-| Deployment | ✅ **`d08c99a19640540f`** — replaces `db3d9cc5eea296cd`, which was deleted, not stopped |
-| Image | ✅ `ghcr.io/terusin71/pii-scrubber:1.2.1`, `linux/amd64`, `sha256:5ec0f449…08ef6b39` |
-| ServingTemplate | ✅ points at `:1.2.1`, labels untouched |
-| Verified **in-container** | `1.2.1 / 100.0 / 45/45 / missed 0 / over_detections 4 / spans 49` |
-| Verified **on the deployment** | ✅ `/v1/selftest` echoes `build_version 1.2.1`, `100.0`, `45/45`, missed 0, `over_detections 4` — **identical to the container** |
-| Harness against the deployment | ✅ `108/111`, leak list identical (`ZHANG`, `Young`, `Mere Tuhoe`), controls 1, header stamped `build: 1.2.1` |
+| Deployment | **`da1b1b3e39367c59`** — replaces `d08c99a19640540f` (1.2.1), deleted not stopped |
+| Image | ✅ `ghcr.io/terusin71/pii-scrubber:1.2.2`, `linux/amd64`, `sha256:958bd5c3…b3ff3fa6` |
+| ServingTemplate | ✅ points at `:1.2.2`, labels untouched |
+| Verified **in-container** | `/v1/info` → exactly `1.2.2`; trap-8 warning logged; `100.0 / 45/45 / missed 0 / over_detections 4 / spans 49`; gates `108/111`, `65/68`, `45/50` unchanged |
+| Verified **on the deployment** | ⛔ **NOT DONE.** Nobody has read `da1b1b3e39367c59` yet |
 
-**Every deployed number now carries the build that produced it.** That is the
+**Contents:** `@app.get("/v1/info")` — identity through the route the gateway
+actually proxies — and the trap-8 warning naming labels `LABEL_MAP` drops.
+Neither changes detection; all four gates must read exactly as above.
+
+⛔ **No deployed figure from 1.2.2 is quotable until the row above closes.**
+As of this release the check is cheap — that was the point of item 1:
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" -H "AI-Resource-Group: default" \
+  "$AI_API/v2/inference/deployments/da1b1b3e39367c59/v1/info"
+```
+
+Expect `"build_version": "1.2.2"`. **No selftest needed to answer "which build
+is this?" any more.** Run `/v1/selftest` after it for the numbers.
+
+⚠️ **`/info` (no `/v1`) is NOT reachable through the gateway.** Confirmed on
+`d08c99a19640540f`, not predicted:
+
+```
+GET $AI_API/v2/inference/deployments/d08c99a19640540f/info  ->  RBAC: access denied
+```
+
+Only `/v1/*` is proxied — which is exactly why `/v1/info` had to be added.
+**An identity check that passes locally proves nothing about the deployment:**
+the first implementation read `/info` alone, was green on every local run, and
+would have printed `unreachable` forever in production.
+
+⚠️ **The trap-8 warning fires on FIRST ANALYZER BUILD, not at process start.**
+Model loading is lazy so `/health` stays instant and readiness probes never
+time out. A pod that has only answered health checks has not logged it yet —
+look after the first `/v1/scrub` or `/v1/selftest`, not immediately after
+`RUNNING`.
+
+### 1.2.1 — shipped and verified end to end (superseded, kept for the record)
+
+Deployment `d08c99a19640540f`, image `sha256:5ec0f449…08ef6b39`. Deployed
+`/v1/selftest` echoed `build_version 1.2.1`, `100.0`, `45/45`, missed 0,
+`over_detections 4` — identical to the container; harness `108/111` with the
+leak list unchanged. Contents: `BUILD_VERSION` baked and echoed; eight
+glossary entries (`GL` `FX` `WM` `MDG` `MRP` `OSS` `CFO` `Rise`);
+`test_deployed.py` stamping the build and the sample set it measured, in place
+of a banner that announced `HOLDOUT RESULT` for any file it was handed.
+
+**Every deployed number now carries the build that produced it.** That was the
 release, and it is closed.
 
-**What 1.2.1 contains:** `BUILD_VERSION` baked at build time and echoed by
-`/info` and `/v1/selftest`; eight glossary entries (`GL` `FX` `WM` `MDG` `MRP`
-`OSS` `CFO` `Rise`); and `test_deployed.py` stamping both the build and the
-sample set it measured, replacing a banner that announced `HOLDOUT RESULT` for
-any file it was handed.
-
-⚠️ **`/info` is NOT reachable through the AI Core inference gateway.**
-Confirmed on this deployment, not merely predicted:
-
-```
-GET $AI_API/v2/inference/deployments/d08c99a19640540f/info   ->  RBAC: access denied
-```
-
-Only `/v1/*` is proxied. Read identity from **`/v1/selftest`**.
-`test_deployed.py` already tries `/info` then falls back; a bare curl must use
-the `/v1/` route. **This is why an identity check that passes locally proves
-nothing about the deployment** — the first implementation read `/info` alone,
-was green on every local run, and would have printed `unreachable` forever in
-production.
-
-Rollback stays cheap: revert the template commit and `:1.2.0` comes back with
+Rollback stays cheap: revert the template commit and `:1.2.1` comes back with
 no image work — but read the build-stamp blind spot under **Settled** first.
-
-**What 1.2.1 contains:** `BUILD_VERSION` baked at build time and echoed by
-`/info` and `/v1/selftest`, so every number carries the artifact that produced
-it; and eight glossary entries (`GL` `FX` `WM` `MDG` `MRP` `OSS` `CFO` `Rise`).
-
-⚠️ **`/info` is NOT reachable through the AI Core inference gateway** — only
-`/v1/*` is proxied, and `GET $AI_API/v2/inference/deployments/<id>/info`
-returns `RBAC: access denied`. Read identity from **`/v1/selftest`** when
-talking to a deployment. `test_deployed.py` already tries `/info` then falls
-back; a bare curl needs the `/v1/` route.
-
-Rollback is unchanged and cheap: the ServingTemplate uses a mutable tag, so
-reverting the template commit puts `:1.2.0` back with no image work.
 
 ---
 
@@ -83,8 +92,8 @@ reverting the template commit puts `:1.2.0` back with no image work.
 
 | Area | State |
 |---|---|
-| Deployment | **`d08c99a19640540f`** on SAP AI Core — deployed self-test not yet read, see the block above |
-| Image | ✅ `ghcr.io/terusin71/pii-scrubber:1.2.1`, **linux/amd64**, `sha256:5ec0f449…08ef6b39` |
+| Deployment | **`da1b1b3e39367c59`** on SAP AI Core — deployed check not yet read, see the block above |
+| Image | ✅ `ghcr.io/terusin71/pii-scrubber:1.2.2`, **linux/amd64**, `sha256:958bd5c3…b3ff3fa6` |
 | GitHub | ✅ `https://github.com/TeruSin71/pii-scrubber-poc` — **private**, branch `deploy/aicore-poc` |
 | AI Core Git sync | ✅ application `pii-scrubber-app` → repo `pii-scrubber-poc`, **path `workflows`**, revision `deploy/aicore-poc` |
 | Scenario | ✅ `pii-scrubber`, version `1.0`, executable `pii-scrubber` |
@@ -100,10 +109,11 @@ Rollback images, all three still in the registry:
 - `1.0.0` (`sha256:8e779fde…f026a1b`) — also lacks the street-address recognizer
 
 ⚠️ **The deployment ID changes on every release.** `d5e6ea76217ed207` was
-1.1.0; `db3d9cc5eea296cd` was 1.2.0; **`d08c99a19640540f` is 1.2.1.** Each
-predecessor is deleted, not stopped — the 1-pod quota forces delete-then-create
-and Kubernetes never re-drives an admission-rejected revision.
-`test_deployed.py` now defaults to `d08c99a19640540f`.
+1.1.0; `db3d9cc5eea296cd` was 1.2.0; `d08c99a19640540f` was 1.2.1;
+**`da1b1b3e39367c59` is 1.2.2.** Each predecessor is deleted, not stopped —
+the 1-pod quota forces delete-then-create and Kubernetes never re-drives an
+admission-rejected revision. `test_deployed.py` now defaults to
+`da1b1b3e39367c59`.
 
 A script pointing at a dead ID fails loudly. A script pointing at a *stale but
 live* one reports confident numbers for the wrong artifact, silently — that is
@@ -610,7 +620,7 @@ source .venv/bin/activate
 python test_fixes.py          # 16/16 — the three fixed defect classes + recall invariant
 python test_address.py        # street-address recognizer, positives and negatives
 
-# against the deployment (DEPLOYMENT_ID defaults to d08c99a19640540f)
+# against the deployment (DEPLOYMENT_ID defaults to da1b1b3e39367c59)
 export AI_API=... TOKEN=...
 python3 test_deployed.py holdout_samples.json
 
