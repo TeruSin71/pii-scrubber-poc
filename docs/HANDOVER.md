@@ -27,30 +27,32 @@ Two paths through the service:
 
 ---
 
-## 1.2.2 — cut over 2026-08-16, deployed check NOT YET READ
+## 1.2.2 — shipped, cut over, verified end to end (2026-08-16)
 
 | | |
 |---|---|
-| Deployment | **`da1b1b3e39367c59`** — replaces `d08c99a19640540f` (1.2.1), deleted not stopped |
+| Deployment | ✅ **`da1b1b3e39367c59`** — replaces `d08c99a19640540f` (1.2.1), deleted not stopped |
 | Image | ✅ `ghcr.io/terusin71/pii-scrubber:1.2.2`, `linux/amd64`, `sha256:958bd5c3…b3ff3fa6` |
 | ServingTemplate | ✅ points at `:1.2.2`, labels untouched |
 | Verified **in-container** | `/v1/info` → exactly `1.2.2`; trap-8 warning logged; `100.0 / 45/45 / missed 0 / over_detections 4 / spans 49`; gates `108/111`, `65/68`, `45/50` unchanged |
-| Verified **on the deployment** | ⛔ **NOT DONE.** Nobody has read `da1b1b3e39367c59` yet |
+| Verified **on the deployment** | ✅ `/v1/info` → `1.2.2` in **one cheap call**; `/v1/selftest` → `1.2.2`, `100.0`, `45/45`, missed 0, `over_detections 4`, spans 49 — **identical to the container** |
 
 **Contents:** `@app.get("/v1/info")` — identity through the route the gateway
 actually proxies — and the trap-8 warning naming labels `LABEL_MAP` drops.
-Neither changes detection; all four gates must read exactly as above.
+Neither changes detection, and none of the four gates moved.
 
-⛔ **No deployed figure from 1.2.2 is quotable until the row above closes.**
-As of this release the check is cheap — that was the point of item 1:
+**Item 1 proved itself in the act of verifying it.** Answering "which build is
+this?" on the deployment now costs one request. Under 1.2.1 the same question
+required a 13-sample selftest, because `/info` is not proxied — which is why
+nobody asked it casually, which is how a stale deployment goes unnoticed.
 
-```bash
-curl -s -H "Authorization: Bearer $TOKEN" -H "AI-Resource-Group: default" \
-  "$AI_API/v2/inference/deployments/da1b1b3e39367c59/v1/info"
-```
+The deployed `/v1/info` also returned `"presidio_loaded": false`, confirming on
+the real deployment that model loading is lazy — and therefore that the trap-8
+warning had not fired yet at that point. See the caveat below.
 
-Expect `"build_version": "1.2.2"`. **No selftest needed to answer "which build
-is this?" any more.** Run `/v1/selftest` after it for the numbers.
+`type_mismatches: 4` is the unchanged baseline: `BJOHNSON`→PERSON,
+`KMUELLER`→ORG_NAME, `MTANAKA`→ORG_NAME, `Hauptstrasse 12, 80331 Munich`→
+PERSON. All four are **redacted**, merely mistyped. Log only, not a leak.
 
 ⚠️ **`/info` (no `/v1`) is NOT reachable through the gateway.** Confirmed on
 `d08c99a19640540f`, not predicted:

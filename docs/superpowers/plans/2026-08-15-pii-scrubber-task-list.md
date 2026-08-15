@@ -456,11 +456,29 @@ Stop and report rather than working around any of these:
 > confirmed on the live deployment. A verification that cannot fail where it
 > matters is not a verification.
 >
-> Next: 1.2.2, two items — `@app.get("/v1/info")`, then the `LABEL_MAP`
-> unknown-label warning.
+> **RE-CLOSED AGAIN 2026-08-16 — 1.2.2 shipped and verified.** Deployment
+> `da1b1b3e39367c59`. Both items landed; no gate moved.
+>
+> The carry-forward from this one is that **a defect's filing can be wrong in
+> a way that outlives the defect.** Trap 8 was recorded as latent and
+> lg-only, so it sat in the backlog for two releases as a hypothetical. It was
+> live on the shipped model the whole time — `FAC` reaches `_norm()` raw and
+> is dropped — and the entry was wrong because it described *how the problem
+> was discovered* rather than *where it applies*. Nobody re-checked the
+> premise, because the note read like a conclusion. Writing the warning took
+> minutes; the two releases of delay came from trusting the filing.
+>
+> Next: nothing is scoped. Candidates, none approved — map `FAC` to a
+> redacting type (needs its own evidence, over-redaction risk); widen the
+> customer-number cue list (`client` is the strongest candidate); GLiNER
+> bake-off (blocked on finding 11). **The only work that changes what is
+> KNOWN about this scrubber is an externally authored blind batch, run once.**
+> All four current sets are burned; everything else is maintenance on figures
+> that already exist.
 
 | Date | Task | Gate | Result |
 |---|---|---|---|
+| 2026-08-16 | **1.2.2 close-out** | ✅ | **Shipped, cut over, verified end to end.** Deployment **`da1b1b3e39367c59`** (replaces `d08c99a19640540f`), image `1.2.2` `linux/amd64` `sha256:958bd5c3…b3ff3fa6`. Deployed `/v1/info` → `1.2.2` in one cheap call; deployed `/v1/selftest` → `1.2.2 / 100.0 / 45/45 / missed 0 / over_detections 4 / spans 49`, **identical to the container**. Gates unchanged: `108/111`, `65/68`, `45/50`. Suites 16 / 39 / 33 / 74 / 17 / 13. **Item 2 corrected trap 8 rather than merely implementing it:** the defect was recorded as "only reachable through lg, which is not shipped" — false. `FAC` is live on `en_core_web_sm`; spaCy emits it, presidio neither maps nor ignores it, so it reaches `_norm()` raw and is dropped. Live all along; nobody had looked. The warning **announces** the drop and does not change detection — mapping `FAC` to a redacting type is an over-redaction risk in SAP prose and is backlogged as its own evidenced item. Caveat recorded: the warning fires on **first analyzer build**, not process start, because model loading is lazy so `/health` stays instant |
 | 2026-08-16 | **1.2.1 close-out** | ✅ | **Shipped, cut over, verified end to end.** Deployment **`d08c99a19640540f`** (replaces `db3d9cc5eea296cd`, deleted not stopped), image `1.2.1` `linux/amd64` `sha256:5ec0f449…08ef6b39`. Deployed `/v1/selftest`: `build_version 1.2.1 / 100.0 / 45/45 / missed 0 / over_detections 4`, **identical to the container**. Harness against the deployment: `108/111`, leak list identical (`ZHANG` `Young` `Mere Tuhoe`), controls 1, header stamped `build: 1.2.1`. Gates all exact: `108/111`, `65/68`, `45/50`. Suites 16 / 39 / 33 / 74 / 14. Over-redactions on the v3 controls **8 → 1**; `over_detections` held at 4. **`/info` confirmed unreachable through the gateway** (`RBAC: access denied`) — the first identity implementation read it alone, was green locally, and would have printed `unreachable` in production forever; fixed to fall back to `/v1/selftest` before shipping. Glossary count reconciled: 37 entries / 36 tokens, `QMEL` duplicates `allowlist.txt`. 1.2.2 scoped at two items |
 | 2026-08-16 | Gate 5 | 5 ✅ | **Blind batch, `holdout_v3.json`, 40 samples / 50 values, run once against `db3d9cc5eea296cd`: 90.0% (45/50), zero novel classes.** Leaks: `NAKAMURA` / `Park` / `Adeyemi` (PERSON, per-token) and `5591230` / `6620945` behind `client` / `ship-to` — both cue-list bounds, `ship-to` excluded by design. **Per-token lottery confirmed on a third dataset:** `VERMEULEN` caught in the identical frame `NAKAMURA` leaked from, which closes the model-size argument. ADDRESS **7/7** including all five Appendix-A street types in real addresses; PHONE **8/8** including first-ever AU and GB; `WAGNER` held against the allowlist; `AADEYEMI2` caught but typed `ORG_NAME` (redacted, mistyped, log only). Docs updated, `DEPLOYMENT_ID` default repointed, 1.2.1 backlogged. HTML reports not touched — already updated |
 | 2026-08-15 | 1.2.0 bundle | — | **Shipped two items, dropped one.** Customer-number fix (twelve cue-gated lookbehind patterns) and jargon glossary (29 evidence-derived entries). `en_core_web_lg` built, measured and **dropped**: net zero across both sets (173/179 either way), two new ORG regressions, 433 MB and 2.2× RSS. Image `sha256:e8a44575…81ca893`, `linux/amd64`, 460 MiB under a 3 GB cap. `over_detections` 6 → **4**, itemised before the baseline was re-asserted |
