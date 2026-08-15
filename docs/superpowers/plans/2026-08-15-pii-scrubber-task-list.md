@@ -147,7 +147,26 @@ Expected diff: `IDENTICAL` — the image ships the same allowlist the local run 
 
 ---
 
-## Task 4 — Publish · ☐ · ~45 min · ⚠️ **mutates remote** · needs U1–U4
+## Task 4 — Publish · ◐ · ~45 min · ⚠️ **mutates remote** · needs U1–U4
+
+> **Half done 2026-08-15. Code published; image blocked on a token scope.**
+>
+> ✅ 4.1 U1/U2/U3 answered · 4.2 secret scan clean (working tree **and** full history)
+> · 4.3 **`https://github.com/TeruSin71/pii-scrubber-poc`** created **private**,
+> branch `deploy/aicore-poc` pushed, default branch set to it. Remote URL carries **no
+> embedded credential**. Remote tree verified: **21 blobs, matching the 21 tracked
+> locally**, none of `.venv/`, `hfcache/`, `corpus/`, candidates or `.env`.
+>
+> ⛔ 4.4–4.6 **blocked — finding 12.** `docker login ghcr.io` **succeeded** (credentials
+> valid), but `docker push ghcr.io/terusin71/pii-scrubber:1.0.0` returned
+> `permission_denied: The token provided does not match expected scopes.` Evidence, not
+> inference. Unblock: user runs `gh auth refresh -s write:packages` (interactive browser
+> flow — cannot be done from this session), then 4.4–4.6 resume unchanged.
+>
+> **U4 remains open and now gates Task 5, not Task 4.** The repo decision was made
+> independently of it, so publishing code was unaffected. But Task 5's ServingTemplate
+> commit must land in whatever repo AI Core's Git sync actually watches — a newly
+> created repo cannot be watched until it is onboarded.
 
 Standing authorization granted for this session; per-command sign-off waived. Steps 1–2 still run first.
 
