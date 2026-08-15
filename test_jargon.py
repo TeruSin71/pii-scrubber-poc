@@ -160,6 +160,82 @@ check("Dockerfile COPY includes glossary.txt",
 check("glossary entries actually reached the live set",
       sum(1 for e in ("Basis", "Config", "Driver", "Way", "PO") if e in A.ALLOWLIST_EXACT) == 5)
 
+# --------------------------------------------------------------------------
+# 6. Bundle 1.2.1 -- eight entries, each traced to a blind-batch sample in
+#    holdout_v3.json (V3-001, V3-034, V3-035, V3-038, V3-039, V3-040).
+#
+#    The sentences below are PARAPHRASES, never the sample text: holdout_v3
+#    is gitignored on purpose and copying it here would put it in the repo
+#    through the back door.
+#
+#    Every frame was checked to misfire BEFORE the entries were added. Three
+#    of the first drafts did not -- "The GL posting failed during the period
+#    close run", an MRP frame and a Rise frame all came back clean, and would
+#    have shipped as three checks that passed before the feature existed.
+#    The misfire is frame-sensitive, not token-sensitive; a paraphrase is not
+#    automatically a test.
+#
+#    Six of the eight are 2-3 chars, below the 4-char SAP_USER_ID floor
+#    (recognizers.py:108), so none was ever a recognizer hit -- they arrive
+#    from the spaCy layer, and they arrive inconsistently typed: WM and MRP
+#    as ADDRESS, the rest as ORG_NAME. Suppression is type-independent, which
+#    is why these assert on the span text rather than its type.
+# --------------------------------------------------------------------------
+print("1.2.1 entries -- observed misfires must stop")
+
+STOPS_121 = [
+    ("GL   (V3-034, fires ORG_NAME)", "Postings to the GL account doubled overnight.", "GL"),
+    ("FX   (V3-034, fires ORG_NAME)", "Revaluation picked up the wrong FX rate for the period.", "FX"),
+    ("WM   (V3-035, fires ADDRESS)",  "Bin determination in WM did not resolve for the depot.", "WM"),
+    ("MDG  (V3-038, fires ORG_NAME)", "The record was blocked in MDG pending data steward review.", "MDG"),
+    ("MRP  (V3-039, fires ORG_NAME)", "The MRP run completes but no planned order appears.", "MRP"),
+    ("OSS  (V3-040, fires ORG_NAME)", "Raised an OSS note with support for the dump.", "OSS"),
+    ("CFO  (V3-001, fires ORG_NAME)", "Escalated to the CFO office for the write-off approval.", "CFO"),
+    ("Rise (V3-035, fires ORG_NAME)", "Management flagged the Rise in open credit memos.", "Rise"),
+]
+
+for name, text, token in STOPS_121:
+    check(name, clean(text, token), f"spans: {spans(text)}")
+
+# The leak guard, applied to the new entries. An entry may veto a PATTERN,
+# never CONTEXT -- this is the group that would show it if that ever broke.
+print("1.2.1 leak guard -- context still overrides every new entry")
+check("'posted by CFO' still redacts",
+      redacted("Adjustment posted by CFO during the close.", "CFO"),
+      A.scrub("Adjustment posted by CFO during the close.", "batch")["scrubbed_text"])
+check("'requested by MDG' still redacts",
+      redacted("Change requested by MDG last Thursday.", "MDG"),
+      A.scrub("Change requested by MDG last Thursday.", "batch")["scrubbed_text"])
+
+# Rise is BOTH jargon and a street type. Section 3 already asserts the
+# address direction; this is the other half. If either breaks, Rise goes to
+# Appendix A, never to a workaround.
+print("1.2.1 Rise -- suppressed as a noun, intact as a street type")
+check("bare 'Rise' does not redact", clean(STOPS_121[7][1], "Rise"),
+      f"spans: {spans(STOPS_121[7][1])}")
+check("'14 Sunrise Rise' still redacts",
+      redacted("Depot at 14 Sunrise Rise, Papakura, Auckland.", "14 Sunrise Rise"),
+      A.scrub("Depot at 14 Sunrise Rise, Papakura, Auckland.", "batch")["scrubbed_text"])
+
+# Case sensitivity, per entry. 'gl' and 'rise' are ordinary words and must
+# never be suppressed; 'RISE' could be a custom object.
+print("1.2.1 leak guard -- case-sensitive exact match holds per entry")
+for tok in ("GL", "FX", "WM", "MDG", "MRP", "OSS", "CFO", "Rise"):
+    check(f"{tok!r} is an entry", tok in A.ALLOWLIST_EXACT)
+for tok in ("gl", "fx", "wm", "mdg", "mrp", "oss", "cfo", "rise", "RISE"):
+    check(f"{tok!r} is NOT an entry", tok not in A.ALLOWLIST_EXACT)
+
+# Still out. A future session that ships one of these must delete the
+# assertion deliberately, not discover it went green by accident.
+print("1.2.1 -- pre-cleared but unshipped street types stay out")
+for tok in ("Close", "Court", "Terrace", "Drive"):
+    check(f"{tok!r} still unshipped (cleared, no observed misfire)",
+          tok not in A.ALLOWLIST_EXACT)
+print("1.2.1 -- lg-only evidence is not evidence about the shipped config")
+for tok in ("SH", "ES_SD_REBATE"):
+    check(f"{tok!r} rejected (misfired only under en_core_web_lg)",
+          tok not in A.ALLOWLIST_EXACT)
+
 print()
 if FAILURES:
     print(f"FAILED: {len(FAILURES)} -> {FAILURES}")

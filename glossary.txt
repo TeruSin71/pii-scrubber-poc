@@ -1,4 +1,4 @@
-# SAP jargon glossary — bundle 1.2.0, item 2.
+# SAP jargon glossary — bundle 1.2.0, item 2; extended by 1.2.1, item 2.
 #
 # Loaded by app._load_allowlist() into the SAME suppression set as
 # allowlist.txt. It is DATA, not mechanism: no separate code path, so it
@@ -37,9 +37,25 @@
 #
 # PRE-CLEARED BUT NOT SHIPPED — street types that passed the safety gate in
 # test_jargon.py but have no observed misfire, so they are not entries yet:
-#   Rise  Close  Court  Terrace  Drive
-# Only "Way" has actually misfired, so only "Way" ships. Add the others when
-# evidence appears, not before.
+#   Close  Court  Terrace  Drive
+# Add them when evidence appears, not before.
+#
+# "Rise" left this list in 1.2.1. It was safety-cleared in Appendix A of the
+# 1.2.0 plan and held back for want of an observed misfire; the blind batch
+# supplied one (V3-035, an ordinary noun mid-sentence). Clearance and
+# evidence pairing up is the protocol working, not an exception to it.
+#
+# 1.2.1 ADDITIONS — each traced to a blind-batch sample. holdout_v3.json is
+# gitignored, so these IDs name a file the reader may not hold: ask for it
+# rather than assuming the entry arrived unevidenced.
+#   GL FX  V3-034      WM Rise  V3-035      MDG  V3-038
+#   MRP    V3-039      OSS      V3-040      CFO  V3-001
+#
+# All except Rise are 2-3 characters, below the 4-char SAP_USER_ID floor
+# (recognizers.py:108), so none was ever a recognizer hit — each arrived
+# from the spaCy layer, and inconsistently typed: WM and MRP surface as
+# ADDRESS, the rest as ORG_NAME. Suppression is type-independent, so one
+# entry covers both.
 
 # --- modules and technical components ---
 Basis		# module
@@ -50,6 +66,12 @@ OData		# module
 Interface	# module
 AP		# module
 RF		# module
+GL		# module
+FX		# module
+WM		# module
+MDG		# module
+MRP		# module
+OSS		# module
 
 # --- landscape environments ---
 DEV		# env
@@ -71,10 +93,12 @@ Way		# process
 Restart		# process
 Reversal	# process
 suffix		# process
+Rise		# process
 
 # --- roles, facilities, departments ---
 Driver		# role
 Payer		# role
+CFO		# role
 DC		# facility
 Switchboard	# facility
 Treasury	# dept
