@@ -196,6 +196,16 @@ was caught but typed `ORG_NAME` — redacted, mistyped, log only.
   protects. Governance decision, not an engineering shortcut.
 - **`holdout_samples.json` is gitignored on purpose.** A holdout anyone can read
   while tuning is not a holdout. Same for the two HTML reports.
+- **A deliberate detection change pre-registers the SPECIFIC values it
+  expects to flip — from measurement, before the run.** A pre-registered flip
+  is a pass. An **unregistered flip is a stop, including a rise**, exactly as
+  a fall is. The tempting relaxation — "a rise is fine as long as it is
+  attributed afterwards" — was proposed and **rejected** at Gate 0 of 1.2.3:
+  it lets a moved number acquire its explanation retroactively, which is the
+  one thing pre-registration exists to prevent. The exact-gate rule
+  (`108/111`, `65/68`, `45/50`, `45/45`) therefore survives detection changes
+  intact; what changes is that the plan must say in advance which values, if
+  any, are allowed to move and why.
 - **The build stamp detects template-to-pod drift, NOT tag mutation.** Know
   the difference before relying on it. If the pod is running an image other
   than the one the template names, `build_version` says so. But a **re-push of

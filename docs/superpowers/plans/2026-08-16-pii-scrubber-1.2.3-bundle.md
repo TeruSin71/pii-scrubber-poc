@@ -39,14 +39,24 @@ in one session for 1.2.1 and 1.2.2; three items in one cutover is the fix.
 | 5 | Facility/technical nouns from the controls **do not** redact | new probe batch |
 | 6 | Selftest recall stays `100.0`, `45/45`, `missed 0` | deployed |
 | 7 | Selftest `over_detections` — **may move; must be itemised span-by-span before the new baseline is asserted** | deployed |
-| 8 | Three gates: recall **must not fall**. A rise is expected-and-allowed for item 3 only, and must be attributed value-by-value | local + container |
+| 8 | Three gates **exactly** `108/111`, `65/68`, `45/50`. **Any movement, either direction, is a stop** | local + container |
 | 9 | Suites all exit 0 at their stated counts | local |
 | 10 | Image `linux/amd64`, in-container `/v1/info` reads exactly `1.2.3` | registry + container |
 
-**Criterion 8 is a change of rule and the reviewer must agree to it.** For
-three releases the gates have been "exactly X, any other value is a stop".
-Item 3 is a deliberate detection change, so a *rise* is now a legitimate
-outcome. It is still a stop if it cannot be attributed to a named value.
+**Criterion 8 keeps the exact-gate rule intact.** An earlier draft proposed
+relaxing it to "must not fall, rises attributed afterwards". **Rejected at
+Gate 0, and the reason is better than the proposal:** independent probes show
+no gate should move at all (§5, Appendix A), so no relaxation is needed — and
+"attributed afterwards" would have reintroduced precisely what §5 exists to
+prevent, a number acquiring its explanation after it moved.
+
+⚠️ **Item 3's observable effect on every existing gate is ZERO by design.**
+This is not a weak result and not an anticlimax — it is the predicted pass.
+Item 3's value is the **unnumbered-street class** ("the warehouse on Willis
+Street"), which **no current evaluation set contains**. Blind batch v4 will
+salt it. A release whose correctness criterion is "nothing moved" is exactly
+what a promotion looks like when its target class is absent from every set
+you already own.
 
 **Time estimate.**
 
@@ -76,10 +86,14 @@ they cannot be dropped without making item 3 unobservable.
 1. **Evidence before action.** Every claim in §3 carries the command or the
    measurement that produced it.
 2. **The plan is the authorization.** Scope is frozen at three items.
-3. **Declare movement in advance.** §5 states which baselines may move and in
-   which direction, **before** they move. A number that moves inside a
-   prediction is a result; a number that moves and then acquires an
-   explanation is a rationalisation.
+3. **Pre-register the specific values, not the direction.** A deliberate
+   promotion names **which values it expects to flip**, derived from
+   measurement, **before the run**. A pre-registered flip is a pass. An
+   unregistered flip is a stop — *including a rise*, exactly as a fall is.
+   "Rises are fine if attributed afterwards" is rejected: it lets a moved
+   number acquire its explanation retroactively, which is the failure this
+   principle exists to prevent. Established at Gate 0 of 1.2.3; applies to
+   every future promotion.
 4. **Promotion needs evidence, exactly as suppression does.** The glossary
    rule ("observed misfire on the shipped config") has a mirror image: a label
    is promoted to a redacting type only on an observed class with a measured
@@ -105,18 +119,46 @@ they cannot be dropped without making item 3 unobservable.
 
 ### 3.2 Item 3 — the FAC evidence, supplied by review
 
-An incidence probe across **all 145 samples** of the three evaluation sets
-found **exactly 4 `FAC` spans**:
+**Corrected at Task 0. The incidence is 8 spans, not 4.**
 
-| Span | Shape |
-|---|---|
-| `Victoria Street` | street name |
-| `Willis Street` | street name |
-| `Great South Road` | street name |
-| `Foveaux Street` | street name |
+| Corpus | Sample | FAC span | Nested inside (already redacted) |
+|---|---|---|---|
+| `holdout_samples` | HO-006 | `Willis Street` | `22 Willis Street` |
+| `holdout_samples` | HO-033 | `Great South Road` | `Unit 7, 156 Great South Road, Otahuhu, Auckland 1062` |
+| `eval_samples_v2` | V2-001 | `Kauri Street` | `27 Kauri Street, Onerahi, Whangarei 0110` |
+| `eval_samples_v2` | V2-003 | `Victoria Street West` | `Private Bag 92019, Victoria Street West, Auckland 1142` |
+| `eval_samples_v2` | V2-004 | `Kaiwharawhara Road` | `44 Kaiwharawhara Road, Wellington` |
+| `eval_samples_v2` | V2-059 | `Kauri Street` | `27 Kauri Street, Onerahi` |
+| `holdout_v3` | V3-026 | `Foveaux Street` | `45 Foveaux Street, Surry Hills NSW 2010` |
+| `samples.json` | TKT-0002 | `Victoria Street` | `44 Victoria Street, Wellington 6011` |
 
-**4 of 4 are street names. Zero false positives.** On this corpus `FAC` *is*
-the ADDRESS class.
+**8 of 8 are street names. 8 of 8 are nested inside an already-planted,
+already-redacted ADDRESS value. Zero appear in a control sample. Zero false
+positives.** On these corpora `FAC` *is* the ADDRESS class.
+
+### A.1b — provenance of the 4 → 8 correction
+
+The original probe reported 4 spans and described the scan as covering all
+145 samples of the three evaluation sets. It in fact covered **3 of the 4
+corpora**: `eval_samples_v2.json` is gitignored and local-only, so it was
+never in the reviewer's sandbox — and v2 holds **exactly the 4 spans that
+were missing** (`Kauri Street` ×2, `Victoria Street West`,
+`Kaiwharawhara Road`). The original 4 are precisely the spans *outside* v2,
+which is what makes the gap self-explaining rather than mysterious.
+
+`Victoria Street` was also attributed to the evaluation sets; it is in
+`samples.json`, the 13-sample selftest corpus.
+
+**The conclusion strengthened rather than survived.** The merge argument was
+made from one span and now holds for all eight: every FAC span in every
+corpus is nested inside a value the address recognizer already covers, so
+mapping `FAC` creates no new redacting span anywhere. Verified span-by-span,
+not sampled.
+
+**The lesson is about scan scope, not arithmetic.** A scan that cannot see a
+gitignored corpus is not a complete scan, however carefully it is run — and
+the corpora deliberately kept out of the repo are exactly the ones a reviewer
+lacks. Any incidence claim must name the corpora it read.
 
 **Why no gate ever showed a FAC leak:** the `street_address` recognizer
 independently covers **numbered** street lines, so anything of the form
@@ -173,38 +215,70 @@ never `docker system prune`, disk ~20 GB free against ~2.5 GB per image.
 | D6 | `FAC` maps to what? | `ADDRESS` | 4/4 observed spans are street names. `ORG_NAME` would type a street as an organisation and mislead the reviewer-restore step. |
 | D7 | Add `FAC` to `LABEL_MAP`, or to the address recognizer? | `LABEL_MAP` | The recognizer is deterministic and regex-based; `FAC` comes from the NLP layer. Fixing it in the recognizer would mean re-implementing NER. |
 | D8 | Verify item 3 against which set? | A **new** probe batch, authored this session | All four existing sets are burned, and none plants an unnumbered street. Tuning against a burned set is forbidden; this batch is a *verification* batch, never a figure. |
-| D9 | Gate rule under a deliberate detection change | Recall may rise, must not fall, every delta attributed value-by-value | "Exactly X or stop" would make a correct improvement indistinguishable from a regression. |
+| D9 | Gate rule under a deliberate detection change | **Exact gates, unchanged.** Pre-register the specific values expected to flip; here, none | The proposed relaxation assumed a gate would legitimately rise. Measurement says none will, so relaxing the rule would trade the project's strongest guard for nothing. |
 
-### Open at Gate 0
+### Answered at Gate 0 — 2026-08-16, binding
 
-| # | Question | Recommendation |
+| # | Question | Answer |
 |---|---|---|
-| Q1 | Criterion 8 changes the gate rule from "exactly X" to "must not fall, rises attributed". Agreed? | **Yes** — but it is the reviewer's call, because it relaxes the strongest guard this project has. |
-| Q2 | The new probe batch is Claude-authored, like `eval_samples_v2.json`. Accept, or must item 3 wait for an externally authored batch? | **Accept as a verification batch.** It verifies a named class, produces no quotable figure, and becomes a gate the moment it is read. |
-| Q3 | If `over_detections` rises on the selftest, is a rise acceptable given item 3 is a promotion? | **Yes if itemised**, no otherwise. State the number after Task 5. |
+| Q1 | Relax the gate rule to "must not fall, rises attributed"? | ⛔ **REJECTED.** Probes show no gate should move, so the relaxation buys nothing and would let a moved number acquire its explanation retroactively. **Exact gates stand.** The general rule it produced is now principle §2.3: a promotion pre-registers the *specific values* expected to flip, from measurement, before the run — an unregistered rise is a stop, same as a fall. |
+| Q2 | Is a Claude-authored FAC probe batch acceptable? | ✅ **YES** — a **development verification set**, same standing as the Gate-2 address verify batch: fine to build against, **never quotable**. R3 applies with a tightening: each probe line must produce a `FAC` span **in the pinned container**, not merely in the venv, before it counts as a test. |
+| Q3 | Is an `over_detections` change acceptable? | ✅ **YES, itemised, with a tightening.** Any new over-detection must be **`ADDRESS`-typed and traceable to the mapping**. A new over-detection of **any other type is a stop.** Expected per the probes: no change. |
 
 ---
 
-## 5. Declared movement — written before anything moves
+## 5. Pre-registration — every value, written before anything runs
 
-This section exists so that a moved number cannot acquire an explanation
-afterwards.
+**The registered prediction is: nothing moves.** Not "probably nothing" —
+nothing, on every existing measurement, derived from probes rather than
+optimism.
 
-| Measurement | Prediction | If it moves the other way |
+| Measurement | Registered value | Any other value |
 |---|---|---|
-| Selftest `recall_pct` / `45/45` | **No change.** Adding a redacting type cannot lose a catch | ⛔ stop — a promotion that loses recall means the merge order changed |
-| Selftest `over_detections` (4) | **May rise.** A FAC span overlapping an already-matched value becomes an extra redacting span | Fall is also possible if FAC now covers a value the address regex missed. Either way: itemise |
-| Selftest `redacting_spans_emitted` (49) | **May rise** | — |
-| `holdout_samples.json` 108/111 | **No change expected** — its addresses are numbered | A rise must name the value; a fall is ⛔ |
-| `eval_samples_v2.json` 65/68 | **Watch `44 Bellbird Rise`.** It is the known ADDRESS leak. If spaCy tags it `FAC`, item 3 closes it and this becomes 66/68 | A rise here is the single most likely legitimate movement in the release |
-| `holdout_v3.json` 45/50 | **No change expected** — its five leaks are PERSON and CUSTOMER_NO | Any change is ⛔ |
-| `test_address.py` 39 | **No change** — recognizer untouched | ⛔ |
-| `test_label_map.py` 13 | **Changes by design.** `FAC` moves from "reported" to "not reported" | The existing FAC assertions must be inverted, not deleted |
-| Container control samples | **May redact more.** Street names in control text will now redact | Expected; record it |
+| Selftest `recall_pct` / `redacted` | `100.0` / `45/45`, `missed 0` | ⛔ stop |
+| Selftest `over_detections` | **`4`** — unchanged | see the tightening below |
+| Selftest `redacting_spans_emitted` | **`49`** — unchanged | ⛔ stop |
+| `holdout_samples.json` | **`108/111`**, leaks `ZHANG` `Young` `Mere Tuhoe` | ⛔ stop, rise or fall |
+| `eval_samples_v2.json` | **`65/68`**, leaks `44 Bellbird Rise` `Okonkwo` `FONTAINE` | ⛔ stop, rise or fall |
+| `holdout_v3.json` | **`45/50`**, five known leaks | ⛔ stop, rise or fall |
+| Suites | 16 · 39 · 33 · 74 · 17 · **13 changes by design** | ⛔ stop |
+| `test_label_map.py` | `FAC` flips from *reported* to *not reported*; `unmapped_labels()` → `[]` | **This is the one registered flip in the release** |
 
-**The `44 Bellbird Rise` case is the one to watch.** If item 3 closes it, a
-burned gate rises for a *correct* reason — exactly the situation criterion 8
-was rewritten for.
+### Why `44 Bellbird Rise` does NOT move
+
+An earlier draft called it "the single most likely legitimate movement".
+**Wrong, and the probe says so:** on the pinned stack `sm` emits no `FAC` span
+for that sentence at all — it yields `Driver`/ORG, `44`/CARDINAL, `DC`/GPE.
+Its leak was never a FAC drop, so item 3 cannot close it. It stays leaked, and
+the gate stays `65/68`.
+
+⚠️ **Task 0 must re-probe this from the actual `eval_samples_v2.json`** — the
+sentence behind the probe was reconstructed from run output, not read from the
+file. If the real sample differs, this prediction is void and the plan returns
+to Gate 0.
+
+### Why the selftest does not move
+
+`samples.json` contains exactly one `FAC` span — `Victoria Street` in
+`TKT-0002` — and it sits **inside** the planted value
+`44 Victoria Street, Wellington 6011`, which is already redacted by the
+address recognizer. Post-mapping the two spans **merge** rather than adding
+one. Hence `over_detections 4` and `spans 49`, both unchanged.
+
+### The over-detection tightening (Q3)
+
+If `over_detections` moves at all, the new detection must be **`ADDRESS`-typed
+and traceable to the mapping**. A new over-detection **of any other type is a
+stop** — nothing else in this release changes detection, so another type
+moving means something unintended shipped.
+
+### What item 3 actually buys, given nothing moves
+
+The **unnumbered-street class**: "the warehouse on Willis Street". It exists in
+no current evaluation set, which is exactly why no gate has ever failed on it
+and why the defect survived three releases. It is measured by the Task 3 probe
+batch now, and **blind batch v4 will salt it** — that is where the class earns
+a real number, authored externally and run once.
 
 ---
 
@@ -284,9 +358,10 @@ Claude-authored and verification-only. Two halves, both required:
 - glossary terms in facility-ish positions
 
 **Verify each "must redact" line actually produces a FAC span BEFORE item 3
-lands.** A probe line that spaCy does not tag `FAC` tests nothing and would
-pass before the feature exists — the exact false-pass that three of eight
-1.2.1 glossary frames hit.
+lands, IN THE PINNED CONTAINER.** A probe line that spaCy does not tag `FAC`
+tests nothing and would pass before the feature exists — the exact false-pass
+that three of eight 1.2.1 glossary frames hit. The venv and the image are not
+guaranteed to agree; the image is what ships, so the image is what counts.
 
 ### Task 4 — map `FAC` → `ADDRESS`
 
@@ -336,8 +411,8 @@ delete `da1b1b3e39367c59`, poll until gone, create clean.
 | # | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|---|
 | R1 | **`FAC` → `ADDRESS` over-redacts SAP facility nouns** | Medium | **High** — unreadable KB entries on the batch path | Probe batch's "must NOT redact" half, drawn from real control samples; four burned gates as backstop |
-| R2 | Mapping lands but the span never redacts (threshold) | Medium | High — a silent no-op that every dict test passes | Task 4 asserts `scrub()` output end to end |
-| R3 | A probe line does not actually produce a FAC span | **High** — three of eight 1.2.1 frames hit this | Medium | Task 3 verifies each line produces FAC *before* item 3 lands |
+| R2 | Mapping lands but the span never redacts (threshold) | **Low** | High — a silent no-op that every dict test passes | Presidio's spaCy recognizer assigns a fixed NER strength (~0.85), which clears the `0.50` ADDRESS floor. **Likelihood downgraded on that basis, but Task 4 still proves it on `scrub()` output** — an inherited assurance is not a measurement, and this project has been wrong about inherited assurances before |
+| R3 | A probe line does not actually produce a FAC span | **High** — three of eight 1.2.1 frames hit this | Medium | Task 3 verifies each line produces FAC *before* item 3 lands, **in the pinned container** — venv agreement is not container agreement (Q2) |
 | R4 | A burned gate rises and gets rubber-stamped as "item 3 working" | Medium | High | §5 predicts direction per set; every delta attributed value-by-value |
 | R5 | Item 1's param defaults diverge from what `get_analyzer()` passes | Low | Medium | Test asserts the **call site**, not only the function |
 | R6 | `/v1/info` field forces an eager model load | Low | Medium — kills instant `/health` | D5; `null` before first build is the design |
@@ -395,10 +470,34 @@ Supplied by review, 2026-08-16. Across all 145 samples of
 4 spans, 4 street names, **zero false positives**. This is the measured
 incidence and false-positive rate that satisfies the promotion rule in §2.4.
 
-**Reproduce before relying on it** (Task 0): the probe is the entire evidence
-base for a detection change, and it was measured by someone else. Verified
-independently on the pinned stack (presidio 2.2.357 + `en_core_web_sm`): `FAC`
-is emitted, unmapped and unignored.
+### A.2 — two probes that predict ZERO gate movement
+
+Both supplied by review on the pinned stack. Together they are why §5
+registers "nothing moves" rather than "something might".
+
+| Probe | Result | Consequence |
+|---|---|---|
+| **`44 Bellbird Rise`** (the known v2 ADDRESS leak) | **No `FAC` span at all.** `sm` yields `Driver`/ORG, `44`/CARDINAL, `DC`/GPE | Its leak was never a FAC drop. Item 3 **cannot** close it. `eval_samples_v2.json` stays `65/68` |
+| **`Victoria Street`** (`samples.json`, `TKT-0002`) | The only `FAC` span in the selftest corpus, and it sits **inside** the planted `44 Victoria Street, Wellington 6011`, already redacted | Post-mapping the spans **merge** instead of adding one. `over_detections 4` and `spans 49` unchanged |
+
+⚠️ **The Bellbird sentence was reconstructed from run output, not read from
+the file.** Task 0 re-probes it from the actual `eval_samples_v2.json`. If the
+real sample differs, §5's registration is void and this plan returns to
+Gate 0 — a pre-registration built on a remembered sentence is not a
+pre-registration.
+
+### A.3 — what the evidence does NOT say
+
+It does not say `FAC` is worth mapping *because a gate improves*. No gate
+improves. It says `FAC` on this corpus is the ADDRESS class with a 4/4 hit
+rate and no false positives, and that the class it protects — unnumbered
+street references — is **absent from every set currently owned**. The
+promotion is justified by incidence and precision, not by a moved number.
+
+**Reproduce before relying on any of it** (Task 0). This is the entire
+evidence base for a detection change and it was measured by someone else.
+Independently confirmed so far on the pinned stack (presidio 2.2.357 +
+`en_core_web_sm`): `FAC` is emitted, unmapped and unignored.
 
 ## Appendix B — Quick reference
 
