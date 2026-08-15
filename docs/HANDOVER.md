@@ -27,17 +27,30 @@ Two paths through the service:
 
 ---
 
-## ⏳ 1.2.1 is IN FLIGHT — published, not deployed (2026-08-16)
-
-Read this before the table below, which still describes **1.2.0, the running
-deployment**. Nothing in it is stale yet; 1.2.1 has not cut over.
+## 1.2.1 — cut over 2026-08-16, deployed self-test NOT YET CONFIRMED
 
 | | |
 |---|---|
-| Image | ✅ **published** — `ghcr.io/terusin71/pii-scrubber:1.2.1`, `linux/amd64`, `sha256:5ec0f449…08ef6b39` |
-| ServingTemplate | ✅ repointed to `:1.2.1` (two-line diff, labels untouched) |
-| Deployment | ⏳ **still `db3d9cc5eea296cd` running 1.2.0.** The cutover is a human step — delete, confirm gone, create clean (finding 16 order) |
-| Verified | selftest in-container `1.2.1 / 100.0 / 45/45 / missed 0 / over_detections 4 / spans 49`, identical to local; three gates exact at 108/111, 65/68, 45/50 with unchanged leak lists |
+| Deployment | **`d08c99a19640540f`** — created by the user, replaces `db3d9cc5eea296cd`, which no longer exists |
+| Image | ✅ published — `ghcr.io/terusin71/pii-scrubber:1.2.1`, `linux/amd64`, `sha256:5ec0f449…08ef6b39` |
+| ServingTemplate | ✅ points at `:1.2.1` (two-line diff, labels untouched) |
+| Verified **in-container** | `1.2.1 / 100.0 / 45/45 / missed 0 / over_detections 4 / spans 49`, identical to local; three gates exact at 108/111, 65/68, 45/50, leak lists unchanged |
+| Verified **on the deployment** | ⛔ **NOT DONE.** Nobody has yet read `/v1/selftest` off `d08c99a19640540f` |
+
+⛔ **Do not quote any deployed figure until that last row is closed.** The
+image was verified as an artifact, not as a running deployment. Asserting the
+two are the same without reading the endpoint is precisely the substitution
+`BUILD_VERSION` exists to make impossible. One command closes it:
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" -H "AI-Resource-Group: default" \
+  "$AI_API/v2/inference/deployments/d08c99a19640540f/v1/selftest" | head -20
+```
+
+Expect `build_version 1.2.1`, `recall_pct 100.0`, `45/45`, `missed 0`,
+`over_detections 4`. Anything else is a stop, and a `build_version` that is
+absent or not `1.2.1` means the pod is running a different image than the
+template names.
 
 **What 1.2.1 contains:** `BUILD_VERSION` baked at build time and echoed by
 `/info` and `/v1/selftest`, so every number carries the artifact that produced
@@ -58,26 +71,34 @@ reverting the template commit puts `:1.2.0` back with no image work.
 
 | Area | State |
 |---|---|
-| Deployment | ✅ **RUNNING** — `db3d9cc5eea296cd` on SAP AI Core |
-| Image | ✅ `ghcr.io/terusin71/pii-scrubber:1.2.0`, **linux/amd64**, `sha256:e8a44575…81ca893` |
+| Deployment | **`d08c99a19640540f`** on SAP AI Core — deployed self-test not yet read, see the block above |
+| Image | ✅ `ghcr.io/terusin71/pii-scrubber:1.2.1`, **linux/amd64**, `sha256:5ec0f449…08ef6b39` |
 | GitHub | ✅ `https://github.com/TeruSin71/pii-scrubber-poc` — **private**, branch `deploy/aicore-poc` |
 | AI Core Git sync | ✅ application `pii-scrubber-app` → repo `pii-scrubber-poc`, **path `workflows`**, revision `deploy/aicore-poc` |
 | Scenario | ✅ `pii-scrubber`, version `1.0`, executable `pii-scrubber` |
-| Allowlist | ✅ 257,583 tokens (`TSTC` + `DD02L`) **+ 28 glossary entries** = 257,611 |
+| Allowlist | ✅ 257,583 (`TSTC` + `DD02L`) **+ 36 glossary tokens** = 257,619. The file holds **37 entries**; `QMEL` is also in `allowlist.txt`, which loads first, so it adds nothing. Entries ≠ tokens — see the reconciliation block atop `glossary.txt` |
 | **Blind batch** | ✅ 40 samples / 50 values, **90.0%**, **zero novel failure classes** |
 | Regression suite | ✅ 108/111 (97.3%) — a gate, **not** a quotable figure |
 | Engine | `presidio` only. **`both` is broken — see finding 11.** |
 
-Rollback images, both still in the registry:
+Rollback images, all three still in the registry:
 
+- `1.2.0` (`sha256:e8a44575…81ca893`) — no `BUILD_VERSION`, 8 glossary entries short
 - `1.1.0` (`sha256:070dea2c…f38290`) — customer-number fix and glossary absent
 - `1.0.0` (`sha256:8e779fde…f026a1b`) — also lacks the street-address recognizer
 
-⚠️ **The deployment ID changed with 1.2.0.** `d5e6ea76217ed207` was 1.1.0 and
-no longer exists. `test_deployed.py` now defaults to `db3d9cc5eea296cd`. If a
-script points at the old ID it will fail, and — worse — a script pointing at a
-*stale but live* deployment reports confident numbers for the wrong artifact.
-That is the incident behind backlog item 1 for 1.2.1 (`BUILD_VERSION`).
+⚠️ **The deployment ID changes on every release.** `d5e6ea76217ed207` was
+1.1.0; `db3d9cc5eea296cd` was 1.2.0; **`d08c99a19640540f` is 1.2.1.** Each
+predecessor is deleted, not stopped — the 1-pod quota forces delete-then-create
+and Kubernetes never re-drives an admission-rejected revision.
+`test_deployed.py` now defaults to `d08c99a19640540f`.
+
+A script pointing at a dead ID fails loudly. A script pointing at a *stale but
+live* one reports confident numbers for the wrong artifact, silently — that is
+the incident behind `BUILD_VERSION`, and **as of 1.2.1 it is detectable**:
+every `test_deployed.py` run prints the `build_version` the service returned,
+so a mismatch between the ID you meant and the build that answered is visible
+in the header instead of being invisible in the numbers.
 
 ---
 
@@ -539,7 +560,7 @@ source .venv/bin/activate
 python test_fixes.py          # 16/16 — the three fixed defect classes + recall invariant
 python test_address.py        # street-address recognizer, positives and negatives
 
-# against the deployment (DEPLOYMENT_ID defaults to db3d9cc5eea296cd)
+# against the deployment (DEPLOYMENT_ID defaults to d08c99a19640540f)
 export AI_API=... TOKEN=...
 python3 test_deployed.py holdout_samples.json
 
