@@ -264,6 +264,14 @@ _analyzer = None
 _gliner = None
 _load_error: Optional[str] = None
 
+# Labels the model emits that LABEL_MAP does not translate, computed once at
+# analyzer build and surfaced by /info. Stays None until that build: the
+# warning it mirrors fires lazily, and reporting [] beforehand would claim
+# "nothing unmapped" before anything could have been checked. None means
+# "not known yet" -- a false negative here would hide the very drop this
+# exists to announce.
+_unmapped: Optional[List[str]] = None
+
 
 # --------------------------------------------------------------------------
 # Lazy model loading -- keeps /health instant so readiness probes never time
@@ -343,7 +351,9 @@ def get_analyzer():
                 # test_label_map.py, which forces unmapped_labels to raise and
                 # asserts detection still works.
                 try:
+                    global _unmapped
                     unmapped = unmapped_labels(nlp_engine, labels_to_ignore=keep)
+                    _unmapped = unmapped
                     if unmapped:
                         log.warning(
                             "LABEL_MAP has no entry for: %s -- spans carrying "
@@ -598,6 +608,9 @@ def info():
         "engine": ENGINE,
         "gliner_model": GLINER_MODEL if ENGINE in ("gliner", "both") else None,
         "spacy_model": SPACY_MODEL,
+        # null until the analyzer is built (lazy). null = "not known yet",
+        # [] = "checked, nothing unmapped". Do not collapse them.
+        "unmapped_labels": _unmapped,
         "presidio_loaded": _analyzer is not None,
         "gliner_loaded": _gliner is not None,
         "last_load_error": _load_error,

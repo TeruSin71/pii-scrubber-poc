@@ -140,6 +140,54 @@ check("both routes are the SAME handler, not a copied payload",
           == [r.endpoint for r in A.app.routes if r.path == "/info"],
       "a second handler would drift from the first")
 
+# ---------------------------------------------------------------------------
+# 1.2.3 item 2. The trap-8 warning fires on first analyzer build, not at
+# process start, because model loading is lazy so /health stays instant. A pod
+# created, health-checked and left idle never logs it. A field on /v1/info is
+# always readable and costs nothing.
+#
+# null before the first build is DELIBERATE and informative: it says "no
+# analyzer yet", not "no problem". [] would be a false negative -- a claim
+# that nothing is unmapped, made before anything could have been checked.
+# ---------------------------------------------------------------------------
+print("Unmapped labels are readable without reading logs")
+
+fresh = A.info()
+check("/info carries an unmapped_labels KEY",
+      "unmapped_labels" in fresh,
+      f"info() keys: {sorted(fresh)}")
+
+# app.selftest() ran earlier in this file, so the analyzer is already built by
+# now; assert the populated shape here and the null-before-build shape in a
+# fresh process below.
+check("unmapped_labels is a list once the analyzer is built",
+      isinstance(fresh.get("unmapped_labels"), list),
+      f"got {fresh.get('unmapped_labels')!r} -- expected a list after build")
+print("null before the first analyzer build -- fresh process, no eager load")
+import json as _json  # noqa: E402
+import subprocess as _sp  # noqa: E402
+
+_proc = _sp.run(
+    [sys.executable, "-c",
+     "import os,json; os.environ.setdefault('SCRUBBER_ENGINE','presidio');"
+     "import app; i=app.info();"
+     "print(json.dumps({'k':'unmapped_labels' in i,"
+     "'v':i.get('unmapped_labels'),'loaded':i['presidio_loaded']}))"],
+    capture_output=True, text=True, timeout=600,
+)
+_line = [l for l in _proc.stdout.splitlines() if l.startswith("{")]
+_payload = _json.loads(_line[-1]) if _line else {}
+check("fresh process: key present before any analyzer build",
+      _payload.get("k") is True, f"stdout tail: {_proc.stdout.strip()[-200:]}")
+check("fresh process: value is null, not []",
+      _payload.get("v") is None,
+      f"got {_payload.get('v')!r} -- [] would claim 'nothing unmapped' "
+      "before anything was checked")
+check("fresh process: /info did NOT force an eager model load",
+      _payload.get("loaded") is False,
+      "presidio_loaded is True -- /info triggered a load and /health is no "
+      "longer instant")
+
 print("Harness identity routes -- gateway-reachable, printed")
 
 harness = open("test_deployed.py").read()
