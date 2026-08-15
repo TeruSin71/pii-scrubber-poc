@@ -398,13 +398,19 @@ GET $AI_API/v2/lm/scenarios                          (AI-Resource-Group: default
    defect was never latent on the shipped config — nobody had looked.
 
    `unmapped_labels()` now computes this from **presidio's own configuration**
-   rather than a reimplemented mapping, and `get_analyzer()` logs it at
-   startup:
+   rather than a reimplemented mapping, and `get_analyzer()` logs it:
 
    ```
    WARNING LABEL_MAP has no entry for: FAC -- spans carrying these labels are
    DETECTED and then silently dropped, never redacted (trap 8)
    ```
+
+   ⚠️ **It fires on first analyzer build, NOT at process start** — model
+   loading is lazy so `/health` stays instant and readiness probes never time
+   out. A pod that has only ever answered health checks has not logged it yet.
+   Look after the first `/v1/scrub` or `/v1/selftest`, not immediately after
+   `RUNNING`. Verified in-container on 1.2.2: absent at boot, present after
+   the selftest. This is a property of the lazy load, which stays.
 
    **This announces the drop; it does not stop it.** Mapping `FAC` to a
    redacting type is a detection change and needs its own evidence — an
