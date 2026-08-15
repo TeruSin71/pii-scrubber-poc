@@ -206,7 +206,7 @@ Standing authorization granted for this session; per-command sign-off waived. St
 > ⛔ **Do not push this commit until finding 13 is fixed.** AI Core now watches this branch,
 > so the push is Task 6 Step 1 and is user-driven.
 
-- [ ] 5.1 Edit `serving_template.yaml:45` — the `image:` value only
+- [ ] 5.1 Edit `workflows/serving_template.yaml:45` — the `image:` value only *(file lived at the repo root until 2026-08-15; moved under `workflows/` per finding 14)*
 
 > **Use the mutable tag, never the digest.** Endorsed 2026-08-15. The `image:` value must
 > be `ghcr.io/<ns>/pii-scrubber:1.0.0`, not `…@sha256:…`. A digest freezes the template to
@@ -230,7 +230,9 @@ Do not touch: scenario/executable/version labels · `resourcePlan: starter` · `
 
 ## Task 6 — AI Core deployment · ☐ · ~60 min · ⚠️ **BTP** · user drives · needs U4, U5
 
-- [ ] 6.1 **Resolve the Git-sync question first (U4)** — if AI Core watches a different repo, Task 5's commit is misplaced
+- [ ] 6.1 **Resolve the Git-sync question first (U4)** — if AI Core watches a different repo, Task 5's commit is misplaced. ✅ answered; see the blocked-on-user table.
+- [ ] 6.1b **Confirm the Application's *Path in Repository* is a real subdirectory, not `.`** — see finding 14. `.` syncs **nothing**, silently. The ServingTemplate must live under that subdirectory; in this repo it is `workflows/serving_template.yaml`.
+- [ ] 6.1c **Do not trust the sync status panel on free tier** — `Sync Status: Unknown`, `Revision: Unknown`, `0 synced resources` is what a *working* application shows there too. The only reliable evidence of a successful sync is the scenario and its executable appearing under *ML Operations → Scenarios*.
 - [ ] 6.2 Hand the user the cockpit runbook (push → registry secret → scenario → configuration → deployment → URL + token)
 - [ ] 6.3 Verify `/health` reachable
 - [ ] 6.4 Capture `/info` — if it reports `both`, **stop before the self-test** (documented crash-loop cause on `starter`)
@@ -332,7 +334,23 @@ Stop and report rather than working around any of these:
 
     <details><summary>Original finding, kept for the record</summary></details>
 
-    ⛔ **Was: OPEN, hard-blocks Task 6.** This machine is Apple Silicon (`uname -m` → `arm64`) and neither the `Dockerfile` nor any plan step specifies `--platform`, so `docker build` produced a native arm64 image and `docker push` published it as an OCI index containing **exactly one runnable platform: `linux/arm64`** (plus a buildkit attestation manifest, `unknown/unknown`, which is normal provenance and not a second platform).
+    ⛔ **Was: OPEN, hard-blocks Task 6.**
+
+14. **AI Core's Application "Path in Repository" must be a real subdirectory — `.` syncs nothing, silently** — ✅ **ROOT-CAUSED AND FIXED 2026-08-15.** `pii-scrubber-app` was onboarded with path `.`, and AI Core **does not scan the repository root**. No scenario appeared, and nothing anywhere reported an error.
+
+    **The diagnostic that settled it** — and the reason this cost time: the *working* reference application (`sandbox-app`, source of the `sd-analytics` scenario) displays **exactly the same** panel as the broken one:
+
+    ```
+    Sync Status: Unknown   Revision: Unknown   0 synced resources
+    ```
+
+    **That panel is cosmetic on free tier and carries no signal.** It reads as a failure indicator and is not one. The only difference between the working and broken applications was the path: `sandbox-app` used `workflows`, ours used `.`.
+
+    **Fix applied:** Application path changed to `workflows` (user, in the cockpit), and `serving_template.yaml` moved to `workflows/serving_template.yaml` in the repo — `git mv`, pure rename, 100% similarity, checksum unchanged (`098309859afe…`). No content change; the image reference and every label are untouched.
+
+    **Consequences for the runbook:** Task 6 Step 1's "wait ~3 min then check the scenario" is still right, but its implicit assumption — that a sync problem would be *visible* — is wrong. Do not diagnose from the status panel. The scenario appearing under *ML Operations → Scenarios* is the only trustworthy evidence, and its absence after a couple of sync cycles points at the path before anything else.
+
+    ⚠️ **Two documents now carry a stale path** and were deliberately not edited here: `README-DEPLOY.html` §3 ("Edit `serving_template.yaml`… Commit it to the repo") and `VSCODE-PROMPT-pii-scrubber-deploy.md`, both of which imply the repo root. `README-DEPLOY.html` is the authorization document under Rule 1, so amending it is a separate, explicit decision rather than a side effect of this move — the same reasoning applied to its stale §7 GLiNER claim (finding 11). Flagged so the next reader does not restore the file to the root. This machine is Apple Silicon (`uname -m` → `arm64`) and neither the `Dockerfile` nor any plan step specifies `--platform`, so `docker build` produced a native arm64 image and `docker push` published it as an OCI index containing **exactly one runnable platform: `linux/arm64`** (plus a buildkit attestation manifest, `unknown/unknown`, which is normal provenance and not a second platform).
 
     ```
     Manifests:

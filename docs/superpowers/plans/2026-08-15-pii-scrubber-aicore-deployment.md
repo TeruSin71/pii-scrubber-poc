@@ -110,7 +110,7 @@ Task 2 runs **only** if the TSTC/DDIC export is available. If it is not, Task 2 
 | `FIXES-2026-08-15.md` | Reconciliation record: what was fixed at source and its plan impact | reference |
 | `requirements.txt` | Pinned dependencies | **never modified** (Rule 7) |
 | `Dockerfile` | CPU-only image, weights baked in | Task 2 Step 6 — one line, **if approved** |
-| `serving_template.yaml` | AI Core ServingTemplate | Task 5 — exactly one line |
+| `workflows/serving_template.yaml` | AI Core ServingTemplate. **Moved from the repo root 2026-08-15** — AI Core's Application *Path in Repository* must be a real subdirectory (`workflows`); `.` syncs nothing, silently. See finding 14. | Task 5 — exactly one line |
 | `.gitignore` | Keeps `.venv/`, `hfcache/`, `.DS_Store` out of the repo | Task 0 — created |
 | `.python-version` | Pins the interpreter for `uv` | Task 0 — created |
 
