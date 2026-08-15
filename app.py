@@ -12,7 +12,9 @@ Engines (env SCRUBBER_ENGINE): presidio | gliner | both
 
 Endpoints:
   GET  /health                      -- instant readiness (does NOT load models)
-  GET  /info                        -- engine + model config
+  GET  /info, /v1/info              -- engine + model config + build_version
+                                       (/v1 route: the AI Core gateway proxies
+                                       /v1/* only, /info returns RBAC denied)
   POST /v1/scrub                    -- scrub one text
   POST /v1/models/pii-scrubber:predict  -- KServe-style wrapper
   GET  /v1/selftest                 -- run the labelled synthetic SAP samples,
@@ -80,6 +82,39 @@ LABEL_MAP = {
     "SAP_DOC_REF": "DOC_REF",
     "URL": "URL", "DATE_TIME": "DATE",
 }
+
+
+def unmapped_labels(nlp_engine) -> List[str]:
+    """Entity labels the NLP layer can emit that LABEL_MAP does not translate.
+
+    Such a label falls through _norm's `label.upper()` default, lands
+    outside REDACT_TYPES, and is discarded with no warning -- the span was
+    detected and then thrown away, which is indistinguishable from never
+    having detected it. Trap 8, and the reason this is announced at startup.
+
+    Reads presidio's OWN configuration rather than reimplementing it: each
+    spaCy label is either translated to a presidio entity, ignored outright,
+    or passed through raw. Only the survivors reach _norm.
+
+    Note the ORG/ORGANIZATION question does not arise here. get_analyzer()
+    un-ignores ORG, but ORG maps to ORGANIZATION and ORGANIZATION is in
+    LABEL_MAP, so the answer is identical with or without that adjustment --
+    which is why this reads the installed default and duplicates no logic.
+    """
+    try:
+        from presidio_analyzer.nlp_engine import NerModelConfiguration
+        cfg = NerModelConfiguration()
+        mapping = cfg.model_to_presidio_entity_mapping or {}
+        ignored = set(cfg.labels_to_ignore or [])
+        model_labels = set()
+        for nlp in (getattr(nlp_engine, "nlp", None) or {}).values():
+            model_labels |= set(nlp.pipe_labels.get("ner", []))
+        emitted = {mapping.get(lb, lb) for lb in model_labels if lb not in ignored}
+        return sorted(e for e in emitted
+                      if e not in LABEL_MAP and e.lower() not in LABEL_MAP)
+    except Exception as exc:
+        log.warning("Could not compute unmapped labels: %s", exc)
+        return []
 
 # Types we always redact. DATE/URL/DOC_REF are detected but reported only,
 # so the POC can show them without over-scrubbing technical text.
@@ -260,8 +295,25 @@ def get_analyzer():
                 if ner_cfg:
                     nlp_conf["ner_model_configuration"] = ner_cfg
                 provider = NlpEngineProvider(nlp_configuration=nlp_conf)
-                engine = AnalyzerEngine(nlp_engine=provider.create_engine(),
+                nlp_engine = provider.create_engine()
+                engine = AnalyzerEngine(nlp_engine=nlp_engine,
                                         supported_languages=["en"])
+
+                # Trap 8: an entity label with no LABEL_MAP entry maps nowhere,
+                # never becomes a redacting type, and is dropped in silence.
+                # Announce it. This does NOT change detection -- mapping a
+                # label to a redacting type is a behaviour change needing its
+                # own evidence -- it makes a silent drop a visible one, so a
+                # future model or spaCy upgrade cannot introduce a leak
+                # without saying so at startup.
+                unmapped = unmapped_labels(nlp_engine)
+                if unmapped:
+                    log.warning(
+                        "LABEL_MAP has no entry for: %s -- spans carrying "
+                        "these labels are DETECTED and then silently dropped, "
+                        "never redacted (trap 8)", ", ".join(unmapped))
+                else:
+                    log.info("LABEL_MAP covers every label the model emits")
 
                 # BOUNDARY GUARD: Presidio's UrlRecognizer pulls the public
                 # suffix list from publicsuffix.org at runtime -- an outbound
@@ -491,7 +543,15 @@ def health():
 
 
 @app.get("/info")
+@app.get("/v1/info")
 def info():
+    # Two paths, ONE handler -- same stacking idiom as health() above.
+    # /info is not proxied by the AI Core inference gateway; only /v1/* is,
+    # and GET $AI_API/v2/inference/deployments/<id>/info returns
+    # "RBAC: access denied" (confirmed on d08c99a19640540f). Without the /v1
+    # route, reading a build off a deployment means running a 13-sample
+    # selftest, so nobody checks casually -- and an identity check people
+    # avoid is one that does not happen.
     return {
         "build_version": BUILD_VERSION,
         "engine": ENGINE,

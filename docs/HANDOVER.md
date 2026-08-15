@@ -384,15 +384,33 @@ GET $AI_API/v2/lm/scenarios                          (AI-Resource-Group: default
    output.** `_merge` can hand an overlap to a longer span of another type,
    hiding a false positive. This produced a false pass on
    `4 Goods Receipt Close` during the address work.
-8. **`LABEL_MAP` silently drops unknown entity labels — latent defect,
-   backlogged.** An entity label with no `LABEL_MAP` entry maps nowhere and
-   never becomes a redacting type. No warning, no log line. Found via
-   `en_core_web_lg`, which types `Harbour Freight` as `FAC` where `sm` types
-   it `ORG` — the value leaked in cleartext. Today it is only reachable
-   through lg, which is not shipped, **but any future model or spaCy upgrade
-   can introduce new labels and the failure is silent.** A startup-time
-   warning listing the model's labels absent from `LABEL_MAP` is a one-liner
-   and turns a silent drop into a visible one. Not in the 1.2.0 bundle.
+8. **`LABEL_MAP` silently drops unknown entity labels — ✅ now ANNOUNCED
+   (1.2.2), and the old assessment of it was wrong.** An entity label with no
+   `LABEL_MAP` entry falls through `_norm()`'s `label.upper()` default, lands
+   outside `REDACT_TYPES`, and is discarded — the span was detected and then
+   thrown away, which is indistinguishable from never detecting it.
+
+   ⚠️ **Correction, measured 2026-08-16.** This entry used to say the defect
+   was "only reachable through lg, which is not shipped". **False. `FAC` is
+   live on `en_core_web_sm` today.** spaCy `sm` emits `FAC`; presidio neither
+   maps it to a presidio entity nor lists it in `labels_to_ignore`, so it
+   arrives at `_norm()` raw, has no `LABEL_MAP` entry, and is dropped. The
+   defect was never latent on the shipped config — nobody had looked.
+
+   `unmapped_labels()` now computes this from **presidio's own configuration**
+   rather than a reimplemented mapping, and `get_analyzer()` logs it at
+   startup:
+
+   ```
+   WARNING LABEL_MAP has no entry for: FAC -- spans carrying these labels are
+   DETECTED and then silently dropped, never redacted (trap 8)
+   ```
+
+   **This announces the drop; it does not stop it.** Mapping `FAC` to a
+   redacting type is a detection change and needs its own evidence — an
+   over-redaction risk in SAP prose, where facility-ish nouns are common.
+   That is a separate item, deliberately not smuggled in here. Asserted by
+   `test_label_map.py`.
 
 **Metadata-as-payload — hit three times, so treat it as a class.** Something
 that reads as *outside* the measurement turns out to be *inside* it. The tell
@@ -548,8 +566,9 @@ change in any of them means something unintended moved.
 | ~~P3~~ | ~~SAP jargon glossary~~ | ✅ **shipped in 1.2.0** — 29 entries; **8 more shipped in 1.2.1**, total 37 entries / 36 tokens. `Close` `Court` `Terrace` `Drive` stay pre-cleared-but-unshipped until evidence appears |
 | ~~—~~ | ~~`BUILD_VERSION` / artifact identity~~ | ✅ **shipped in 1.2.1** — baked at build time, echoed by `/info` and `/v1/selftest`, printed by `test_deployed.py`. Detects template-to-pod drift, **not** tag mutation — see Settled |
 | ~~P2~~ | ~~`en_core_web_lg` upgrade~~ | ⛔ **CLOSED 2026-08-15, not deferred.** Measured net zero (173/179 either way), two new ORG regressions, 433 MB and 2.2× RSS. The residual class is an engine-level question, not a model-size one — see the finding above |
-| **1.2.2** | `@app.get("/v1/info")` | **approved 2026-08-16, item 1.** `/info` is not proxied by the AI Core gateway, so reading a build today costs a 13-sample selftest. Identity should be cheap enough to check reflexively. One decorator line |
-| **1.2.2** | `LABEL_MAP` unknown-label warning | **approved 2026-08-16, item 2.** Latent defect: unmapped entity labels are dropped silently and leak. One-liner at startup. Trap 8 |
+| ~~1.2.2~~ | ~~`@app.get("/v1/info")`~~ | ✅ **built 2026-08-16** — one decorator on the existing handler, same stacking idiom as `/health`. Identity is now free to check |
+| ~~1.2.2~~ | ~~`LABEL_MAP` unknown-label warning~~ | ✅ **built 2026-08-16** — and it corrected trap 8: `FAC` is live on the SHIPPED `sm` model, not lg-only as recorded. Announces the drop, does not change detection |
+| — | map `FAC` to a redacting type? | **opened by the 1.2.2 warning.** Needs its own evidence: `FAC` covers facilities, and SAP prose is full of facility-ish nouns, so this is an over-redaction risk, not a free win. Do not fold into a release without a measured case |
 | ~~—~~ | ~~expand the sample set to 50–100~~ | ✅ **done 2026-08-15** — `eval_samples_v2.json`, 65/68. Synthetic and Claude-authored; now burned as a gate at exactly 65/68 |
 | — | GLiNER bake-off / Local LLM | **the only open route for the residual PERSON class.** Blocked on finding 11. Not a model-size question — the per-token lottery is confirmed on three datasets |
 | — | real anonymised ticket shapes | every evaluation set to date is synthetic. The blind batch removed the *authorship* bias, not the *synthetic* one |

@@ -119,6 +119,27 @@ if env_lines and copy_lines:
 # "unreachable" on every deployed one. Structural, because reproducing the
 # gateway's RBAC locally is not possible.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# 1.2.2 item 1. /info is not proxied by the AI Core gateway -- only /v1/* is,
+# and GET $AI_API/v2/inference/deployments/<id>/info returns
+# "RBAC: access denied" (confirmed on d08c99a19640540f). Without a /v1 route,
+# reading a build off a deployment costs a 13-sample selftest, so nobody
+# checks casually -- and an identity check people avoid is one that does not
+# happen. Same handler, second decorator: no new payload to drift.
+# ---------------------------------------------------------------------------
+print("Identity is reachable through the gateway")
+
+routes = {r.path for r in A.app.routes}
+check("/v1/info route is registered", "/v1/info" in routes,
+      f"routes: {sorted(p for p in routes if 'info' in p or 'health' in p)}")
+check("/info route still registered (local callers unbroken)",
+      "/info" in routes, f"routes: {sorted(routes)}")
+check("both routes are the SAME handler, not a copied payload",
+      len({tuple(sorted(A.info()))}) == 1
+      and [r.endpoint for r in A.app.routes if r.path == "/v1/info"]
+          == [r.endpoint for r in A.app.routes if r.path == "/info"],
+      "a second handler would drift from the first")
+
 print("Harness identity routes -- gateway-reachable, printed")
 
 harness = open("test_deployed.py").read()
