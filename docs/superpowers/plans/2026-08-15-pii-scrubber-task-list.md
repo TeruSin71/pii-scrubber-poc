@@ -28,7 +28,7 @@ These gate Tasks 4–6 only. **Tasks 0 through 3 can run start to finish without
 | # | Needed for | Question |
 |---|---|---|
 | U1 | Task 4 | GitHub repo URL, or "create it". The URL supplied so far is the PAT settings page, not a repo. |
-| U2 | Task 4 | Registry: Docker Hub (needs separate Docker Hub credentials) or `ghcr.io` (reuses the PAT, but it needs **Packages: write**). |
+| U2 | Task 4 | Registry: Docker Hub (needs separate Docker Hub credentials) or `ghcr.io` (reuses the PAT, but it needs **Packages: write**). **Answered `ghcr.io` 2026-08-15 — but see finding 12: the credential actually present on this machine lacks `write:packages`.** |
 | U3 | Task 4 | Private or public. Private recommended. |
 | U4 | Tasks 4, 6 | Which repo/branch AI Core's Git sync already watches (*AI Launchpad → Administration → Git Repositories*). If it isn't the new repo, Task 5's commit lands in the wrong place. |
 | U5 | Task 6 | BTP cockpit work + `$DEPLOYMENT_URL` and bearer token. User drives; agent never holds BTP credentials. |
@@ -235,7 +235,33 @@ Stop and report rather than working around any of these:
 
     `gliner==0.2.16` is incompatible with the `huggingface_hub` version pip resolves (unpinned in `requirements.txt`, transitively current). The failing call is `GLiNER.from_pretrained`, which is **exactly what `get_gliner()` calls at runtime** — so setting `SCRUBBER_ENGINE=both` would raise the same `TypeError` and take the deployment down, with no weights baked in either.
 
-    **This invalidates the plan's standing claim that "switching to `both` is a configuration change, not a rebuild."** On this dependency set it is neither — it is a dependency fix requiring a `huggingface_hub` pin, which is Rule 7 work needing approval. The out-of-scope GLiNER bake-off is blocked until that is decided. Presidio-only, which is what Tasks 4–6 deploy, is entirely unaffected.
+    **This invalidates the plan's standing claim that "switching to `both` is a configuration change, not a rebuild."** On this dependency set it is neither.
+
+    **⛔ The shipped `pii-scrubber:1.0.0` image cannot run `engine=both`.** Setting the
+    AI Core `engine` parameter to `both` against this image raises the `TypeError`
+    above at first `get_gliner()` call and takes the deployment down. There are also no
+    GLiNER weights baked in, because the prefetch that would have cached them is the
+    step that failed. Deploy `engine=presidio` only, which is what the ServingTemplate
+    already defaults to.
+
+    **Fix path (deferred, do NOT attempt in this session):** pin `huggingface_hub` in
+    `requirements.txt` to a version whose `hub_mixin.from_pretrained` matches
+    `gliner==0.2.16`'s `_from_pretrained` signature, then rebuild the image. Pinning a
+    dependency is **Rule 7 work and needs explicit approval**; the rebuild is a further
+    ~20 minutes and a new image tag. Owner: the **GLiNER bake-off session**, which is
+    already out of scope here (`README-DEPLOY.html` §7).
+
+    ⚠️ **`README-DEPLOY.html` §7 is now inaccurate** — it states "Create a second
+    configuration with `engine = both` … No rebuild needed." That is false on this
+    dependency set. Not edited here: the runbook is the authorization document
+    (Rule 1) and amending it is the bake-off session's call, not this one's. Flagged so
+    nobody follows §7 straight into a crash-loop.
+
+    Presidio-only, which is what Tasks 4–6 deploy, is entirely unaffected.
+
+12. **The available GitHub credential lacks `write:packages`** — ⛔ **OPEN, blocks the `ghcr.io` push.** Checked before attempting anything remote, so this is a prediction rather than a post-mortem. `gh auth status` reports account **TeruSin71**, authenticated via keyring, token scopes **`gist`, `read:org`, `repo`** — no `write:packages`. Also on this machine: **no git remote** configured, **no** token-shaped environment variable present, and `~/.docker/config.json` has **no registry logins** (`credsStore: desktop`).
+
+    U2 was answered "ghcr.io, PAT has Packages: write", but the credential actually reachable here does not have it. A `docker push ghcr.io/…` would 403 — which the runbook itself predicts is a scope problem, not an auth problem. Three ways out, all the user's call: re-run `gh auth refresh -s write:packages`, supply a separate classic PAT with `write:packages` via env at point of use, or switch to Docker Hub. Do not attempt the push until one is settled.
 4. **Bare `AnalyzerEngine()` downloads `en_core_web_lg`** — ⚠️ **OPEN, standing session rule.** Presidio's default model resolution fetches `lg` (400 MB) over the network. Found by causing it during Task 1 diagnosis; uninstalled, `['en_core_web_sm']` confirmed restored. **Never construct a bare `AnalyzerEngine()`** — mirror `app.py` (explicit `NlpEngineProvider` on `SPACY_MODEL`) or import `app.get_analyzer()`. Rule 3 hazard, not a style point. Repo audited: only `app.py:209`, which passes `nlp_engine` explicitly. Task 3.5b verifies the image.
 5. **`ORG_NAME` undetectable for suffix-less organisations** — ✅ **FIXED 2026-08-15** (`FIX-GATE1-ORG.md`). `presidio-analyzer==2.2.357` default `labels_to_ignore` contains `ORG`/`ORGANIZATION`, so spaCy's ORG label was dropped at the **NLP-engine layer, before any recognizer ran**; the only other path, `recognizers.py:102`, needs a legal suffix (GmbH/Ltd/…), which `Pacific Traders` lacks. `get_analyzer()` now rebuilds the ignore list from the installed default minus `ORG`/`ORGANIZATION` — reading installed values, so it is a no-op on 2.2.364. **This raises recall by restoring a suppressed detection path; it is the inverse of stop-condition 3, which forbids weakening detection.** Verified here: `100.0` / `45/45` / `over_detections 6`, log line `ORG un-ignored at NLP layer (11 labels still ignored)`. Pinned against regression by `test_fixes.py` Defect 4.
 
