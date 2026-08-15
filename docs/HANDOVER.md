@@ -131,6 +131,34 @@ reading a claim about `README-DEPLOY.html` anywhere in this file, check
 | HO-031 | PERSON | `Mere Tuhoe` | full name spaCy missed | strict adjacency + `sm` frame sensitivity — **needs a window, and the model** |
 | HO-009 | CUSTOMER_NO | `1045567` | keyed without leading zeros | **no pattern matches at all** — both require 10 digits, the value has 7 |
 
+### ⛔ The `en_core_web_lg` item is CLOSED, not deferred — 2026-08-15
+
+Evaluated as item 3 of the 1.2.0 bundle, measured, and **dropped before
+shipping**. Two records, both load-bearing:
+
+> **Model swaps are global changes.** The lg promotion was decided on a
+> PERSON-only slice; the full leak guard later found two ORG regressions (one
+> span typed FAC with no LABEL_MAP entry, one span not emitted at all). Net
+> effect across both sets: zero. Never evaluate a model change on one entity
+> type.
+
+> **The lg item is closed, not deferred:** both spaCy models exhibit per-token
+> frame sensitivity, they merely fail on different tokens. The residual
+> PERSON/ORG gap is not addressable at the spaCy layer. Anything further on
+> this class is an engine-level question (GLiNER bake-off or the Local LLM
+> option), not a model-size question.
+
+The measurement, for anyone tempted to re-open it:
+
+| | holdout | v2 | total |
+|---|---|---|---|
+| `en_core_web_sm` | 108/111 | 65/68 | **173/179** |
+| `en_core_web_lg` | 107/111 | 66/68 | **173/179** |
+
+lg recovered `Mere Tuhoe` and `FONTAINE`, and lost `Shenzhen Precision`
+(no entity emitted at all) and `Harbour Freight` (typed `FAC`). It costs
+433 MB of image and takes peak RSS from 421 MB to 920 MB for that.
+
 **These are three person classes, not one — and only one of the three is a
 rule problem.** A rule-based context promoter was built, measured and
 **reverted** on 2026-08-15: it fired zero times on these 40 samples, once with
@@ -160,6 +188,30 @@ needs role and module vocabulary, not just street types. `3 Way match` is the
 clean demonstration that this lives above the recognizers: `test_address.py`
 asserts the ADDRESS recognizer declines it, and `Way` still comes out
 `<ORG_NAME>`.
+
+**Addressed in 1.2.0 by `glossary.txt`** — 29 entries, loaded through the same
+loader into the same suppression set as `allowlist.txt`, so it inherits
+case-sensitive exact match, the ±40-char user-context backstop and whole-span
+matching rather than reimplementing them.
+
+**Shipping criterion is "observed misfire", not "proven safe."** Every entry
+traces to an incident — a redacting span that covered no expected value in
+`samples.json`, `holdout_samples.json` or `eval_samples_v2.json`. Words that
+pass the safety gate but have never misfired stay **unshipped**: `Rise`,
+`Close`, `Court`, `Terrace` and `Drive` are cleared in Appendix A of the
+1.2.0 plan, with the analysis already done, and become a one-word add the
+moment evidence appears. This is what keeps the glossary auditable — every
+line answers "which incident put you here?"
+
+⚠️ **Glossary coverage is bounded by the corpora it was mined from.**
+Production jargon outside those three files is not covered, and adding it
+means edit-and-redeploy — a code change, a rebuild and a stop/create cycle on
+a 1-pod free tier. That is the standing argument for a **reviewer-restore
+step** when the BPA flow is designed: the glossary handles the head of the
+distribution, a human reviewer handles the tail. Do not attempt to close the
+tail by growing the glossary speculatively — that trades an auditable list
+for an unauditable one and reintroduces exactly the leak risk each rejection
+in Appendix A was recorded to avoid.
 
 ### Address coverage limits, accepted deliberately
 
@@ -223,6 +275,15 @@ GET $AI_API/v2/lm/scenarios                          (AI-Resource-Group: default
    output.** `_merge` can hand an overlap to a longer span of another type,
    hiding a false positive. This produced a false pass on
    `4 Goods Receipt Close` during the address work.
+8. **`LABEL_MAP` silently drops unknown entity labels — latent defect,
+   backlogged.** An entity label with no `LABEL_MAP` entry maps nowhere and
+   never becomes a redacting type. No warning, no log line. Found via
+   `en_core_web_lg`, which types `Harbour Freight` as `FAC` where `sm` types
+   it `ORG` — the value leaked in cleartext. Today it is only reachable
+   through lg, which is not shipped, **but any future model or spaCy upgrade
+   can introduce new labels and the failure is silent.** A startup-time
+   warning listing the model's labels absent from `LABEL_MAP` is a one-liner
+   and turns a silent drop into a visible one. Not in the 1.2.0 bundle.
 
 **Metadata-as-payload — hit three times, so treat it as a class.** Something
 that reads as *outside* the measurement turns out to be *inside* it. The tell
@@ -327,7 +388,8 @@ refuses to suppress a pure-alpha token when user-context words ("posted by",
 | ~~P2~~ | ~~person-context promoter~~ | ⛔ **closed 2026-08-15 as a negative result** — built, measured, reverted. Reaches ~1/3 of the residual PERSON class. `PERSON-CONTEXT-FINDING.md` |
 | P2 | unpadded customer number | `1045567`, plus `2298871` and `4471902` from the v2 batch — 3 data points now. **Not a scoring problem:** `sap_customer_padded` is `\b000\d{7}\b` and `sap_customer_ctx` is `\b\d{10}\b`, both requiring 10 digits, and every unpadded value has 7 — nothing matches, so there is no score to raise. (An earlier note here claimed "0.35 against a 0.50 floor"; that was wrong.) Self-contained; **the only remaining leak class that rules can close** |
 | P3 | SAP jargon glossary | the `<ORG_NAME>` over-redaction class — now known to include module and role nouns (`Basis`, `Driver`), not only street types |
-| P2 | `en_core_web_lg` upgrade | **promoted from P3.** Scoped as **frame robustness**, not vocabulary. v2 evidence: `MBEKI` caught but `FONTAINE` leaked, `Ratana` caught but `Okonkwo` leaked — same class, same shape, opposite results. Owns HO-018, HO-031 and the residual PERSON class |
+| ~~P2~~ | ~~`en_core_web_lg` upgrade~~ | ⛔ **CLOSED 2026-08-15, not deferred.** Measured net zero (173/179 either way), two new ORG regressions, 433 MB and 2.2× RSS. The residual class is an engine-level question, not a model-size one — see the finding above |
+| P3 | `LABEL_MAP` unknown-label warning | latent defect: unmapped entity labels are dropped silently and leak. One-liner at startup. Trap 8 |
 | ~~—~~ | ~~expand the sample set to 50–100~~ | ✅ **done 2026-08-15** — `eval_samples_v2.json`, 65 samples / 68 values, 92.6%. Synthetic and Claude-authored, so it supplements the blind holdout rather than replacing it. **Still worth replacing with real anonymised ticket shapes when they exist** |
 | — | GLiNER bake-off | blocked on finding 11 |
 
