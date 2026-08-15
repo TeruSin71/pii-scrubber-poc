@@ -16,16 +16,71 @@ from presidio_analyzer import Pattern, PatternRecognizer
 CASE_SENSITIVE = re.DOTALL | re.MULTILINE
 
 
+# Cues that put the FOLLOWING number in a customer-account slot. FROZEN at
+# six words, both cases spelled out.
+#
+# Case variants are enumerated rather than left to a flag because Presidio's
+# PatternRecognizer defaults to IGNORECASE, and this project has already paid
+# for that once: the SAP user-ID pattern matched ordinary lowercase words and
+# emitted 249 spans against 45 real values. Explicit beats inherited.
+#
+# `ship-to` is deliberately NOT here. In delivery text it cues an address far
+# more often than an account number, and ADDRESS already owns that.
+_CUST_CUES = [
+    "Customer ", "customer ", "Account ", "account ",
+    "Sold-to ", "sold-to ", "Payer ", "payer ",
+    "Bill-to ", "bill-to ", "Debtor ", "debtor ",
+]
+
+
 def sap_customer_number_recognizer() -> PatternRecognizer:
-    """SAP customer numbers: 10 digits, conventionally zero-padded (0001045567)."""
+    """
+    SAP customer numbers, padded (0001045567) and unpadded (1045567).
+
+    The unpadded form is NOT a scoring problem. Both original patterns require
+    ten digits, and every unpadded value seen in the wild has seven -- nothing
+    matched at all, so there was no score to raise. It needs its own pattern.
+
+    One Pattern per cue, each carrying a fixed-width lookbehind. Two reasons
+    it takes that shape rather than a single `<cue>\\s+<number>` pattern:
+
+      1. presidio-analyzer 2.2.357 reports match.span() for the WHOLE match
+         and has no capture-group support, so the cue would be redacted too --
+         "customer 2298871" would become "<CUSTOMER_NO>". That is the exact
+         defect that forced the person promoter out of the recognizer layer
+         (PERSON-CONTEXT-FINDING.md).
+      2. Python's re allows only a FIXED-WIDTH lookbehind, so the cues cannot
+         share one alternation. Each gets its own pattern instead.
+
+    Score 0.75 clears the 0.50 CUSTOMER_NO floor on its own. The floor is not
+    touched -- it governs every recognizer, so admitting one entity type by
+    lowering it would admit every sub-threshold span in the pipeline, and a
+    customer-number test would never reveal that.
+
+    Digit range is 6-9, not 6-10: the padded pattern keeps sole ownership of
+    ten-digit strings, so no two patterns claim the same text.
+
+    Accepted cost, deliberate: "account 400000" redacts GL account numbers.
+    A redacted GL account costs readability; a leaked customer number costs
+    compliance. Documented at Gate 0 and not engineered around.
+    """
     patterns = [
         Pattern(name="sap_customer_padded", regex=r"\b000\d{7}\b", score=0.85),
         Pattern(name="sap_customer_ctx", regex=r"\b\d{10}\b", score=0.35),
+    ]
+    patterns += [
+        Pattern(name=f"sap_customer_unpadded_{i}",
+                regex=rf"(?<={re.escape(cue)})\d{{6,9}}\b",
+                score=0.75)
+        for i, cue in enumerate(_CUST_CUES)
     ]
     return PatternRecognizer(
         supported_entity="SAP_CUSTOMER_NO",
         patterns=patterns,
         context=["customer", "sold-to", "ship-to", "bill-to", "kunnr", "payer", "account"],
+        # Required by the enumerated cue variants above. The two original
+        # patterns are digit-only, so this cannot change their behaviour.
+        global_regex_flags=CASE_SENSITIVE,
     )
 
 
