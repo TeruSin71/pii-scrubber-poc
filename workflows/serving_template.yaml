@@ -9,8 +9,7 @@ metadata:
     executables.ai.sap.com/description: "Inference-only serving of the PII scrubber"
   labels:
     scenarios.ai.sap.com/id: "pii-scrubber"
-    executables.ai.sap.com/id: "pii-scrubber-serve"
-    ai.sap.com/version: "1.0.0"
+    ai.sap.com/version: "1.0"
 
 spec:
   inputs:
