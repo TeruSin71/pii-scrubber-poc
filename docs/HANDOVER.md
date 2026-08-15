@@ -111,23 +111,31 @@ resolves. The failing call is `GLiNER.from_pretrained`, which is exactly what
 `huggingface_hub` in `requirements.txt` (Rule 7, needs approval) and rebuild.
 Owner: the **GLiNER bake-off session**, which is a separate session.
 
-⚠️ `README-DEPLOY.html` §7 still says "create a second configuration with
-`engine = both` … No rebuild needed." That is false. It was deliberately not
-edited — the runbook is the authorization document under Rule 1, so amending it
-is its own decision. §3 likewise still implies the template lives at the repo
-root; it moved to `workflows/`.
+✅ **Resolved 2026-08-15 by commit `a9bed3e`** — `README-DEPLOY.html` was
+corrected in five places, including §7 (`engine = both` now marked blocked,
+with the traceback and fix path) and §3 (template path now `workflows/`). The
+paragraph that stood here said the runbook had deliberately *not* been edited;
+that was true when written and stopped being true the same day. If you are
+reading a claim about `README-DEPLOY.html` anywhere in this file, check
+`git log -- README-DEPLOY.html` before acting on it.
 
 ### The 4 holdout leaks — the tuning backlog
 
 | Sample | Type | Value | Class |
 |---|---|---|---|
-| HO-001 | PERSON | `ZHANG` | all-caps surname |
-| HO-018 | PERSON | `Young` | bare surname, sentence-initial |
-| HO-031 | PERSON | `Mere Tuhoe` | **full name spaCy simply missed** |
-| HO-009 | CUSTOMER_NO | `1045567` | keyed without leading zeros |
+| Sample | Type | Value | Class | Diagnosed cause (2026-08-15) |
+|---|---|---|---|---|
+| HO-001 | PERSON | `ZHANG` | all-caps surname | cue enumeration — **solvable by rules** |
+| HO-018 | PERSON | `Young` | bare surname, sentence-initial | cue-free subject position — **needs POS/dependency parsing** |
+| HO-031 | PERSON | `Mere Tuhoe` | full name spaCy missed | strict adjacency + `sm` frame sensitivity — **needs a window, and the model** |
+| HO-009 | CUSTOMER_NO | `1045567` | keyed without leading zeros | pattern scores 0.35 against a 0.50 floor |
 
-**These are three person classes, not one.** A context-promoter scoped only at
-the `ZHANG` class closes one of the three. Scope the next prompt accordingly.
+**These are three person classes, not one — and only one of the three is a
+rule problem.** A rule-based context promoter was built, measured and
+**reverted** on 2026-08-15: it fired zero times on these 40 samples, once with
+one more cue word. See `PERSON-CONTEXT-FINDING.md` for the full negative
+result, including why the remaining two classes need the NLP layer rather than
+more rules. Do not re-attempt a regex promoter without reading it first.
 
 ### Over-redaction of SAP jargon — one layer up from where it was fixed
 
@@ -261,16 +269,19 @@ refuses to suppress a pure-alpha token when user-context words ("posted by",
    (gitignored, local only).
 4. `VSCODE-PROMPT-address-recognizer.md` — the prompt that produced the address
    work; a good template for the remaining backlog items.
+5. `PERSON-CONTEXT-FINDING.md` — why the rule-based person promoter was built
+   and then **not shipped**. Read before touching the PERSON class.
 
 **Backlog, roughly in value order:**
 
 | | Item | Note |
 |---|---|---|
 | ~~P1~~ | ~~street addresses~~ | ✅ **closed 2026-08-15** — 0/3 → 3/3 |
-| P2 | person-context promoter | scope for **three** classes, not just `ZHANG` |
-| P2 | unpadded customer number | `1045567` — pattern requires the padded form |
+| ~~P2~~ | ~~person-context promoter~~ | ⛔ **closed 2026-08-15 as a negative result** — built, measured, reverted. Reaches ~1/3 of the residual PERSON class. `PERSON-CONTEXT-FINDING.md` |
+| P2 | unpadded customer number | `1045567` — `sap_customer_ctx` scores 0.35 against a 0.50 floor. Self-contained; the only remaining leak that rules can close |
 | P3 | SAP jargon glossary | the `<ORG_NAME>` over-redaction class |
-| — | expand the sample set to 50–100 real-shaped samples | **highest value overall** — everything above is measured against 40 |
+| P3 | `en_core_web_lg` upgrade | scoped as **frame robustness**, not vocabulary — `sm` tags `Mere Tuhoe` in one sentence frame and misses it in another. Owns HO-018 and HO-031 |
+| — | expand the sample set to 50–100 real-shaped samples | **highest value overall** — everything above is measured against 40, where one sample is worth 0.9 points |
 | — | GLiNER bake-off | blocked on finding 11 |
 
 Every task ends at an approval gate with a stated deliverable and word limit.
