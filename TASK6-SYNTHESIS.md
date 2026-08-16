@@ -150,6 +150,23 @@ or *overlaps* a protected token, instead of only one that equals it. That is a
 **detection change** and needs its own plan, its own pre-registration and its
 own both-directions evidence — it must not be folded in here.
 
+⛔ **OUTCOME, recorded 2026-08-16 — this paragraph's expectation did NOT hold,
+and the word "unblocking" is the part that was wrong.** Overlap-aware
+suppression was planned, pre-registered, executed and shipped to the candidate
+with every gate exact. **Control damage moved 8 → 7 of 21, against presidio's
+2.** Two further levers were then enumerated and closed: per-type thresholds
+are **OUT by measurement** (GLiNER's over-detections and true positives
+interleave), and the label subset is **OUT by derivation** (it relocates the
+damage onto real cities and nationality adjectives, the class `glossary.txt`
+rejected). Vocabulary tops out at 7 → 4 and is capped by ALL-TOKENS semantics.
+⛔ **No lever reaches presidio's 2 of 21, so batch-as-union is a PRODUCT
+decision, not an engineering one.** Escalated to Teru; the engineering track is
+parked. Ledger and derivation: `docs/HANDOVER.md` START HERE and
+`OVERLAP-SUPPRESSION-RUNLOG.md` Appendix. ⚠️ Also note the phrasing above —
+*"a span that contains or overlaps a protected token"* — is the semantics that
+was **disqualified by measurement**: it un-redacts `PO Box 91020, Auckland`.
+The shipped rule is ALL-TOKENS.
+
 ⚠️ **The reviewer-restore token map becomes more important, not less.** If
 batch ever ships as `both`, a human gate that can restore over-redacted jargon
 is the mitigation for precisely this class. Promoted to the release plan's open

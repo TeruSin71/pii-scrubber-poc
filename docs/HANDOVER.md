@@ -1,26 +1,32 @@
 # PII Scrubber — Handover
 
-**Last updated 2026-08-16, after the GLiNER bake-off closed.** Written for
-someone picking this up with zero prior context. **Read the START HERE block
-below first** — it is the only section guaranteed current; everything after it
-is dated record.
+**Last updated 2026-08-16, after the engineering track converged and was
+PARKED.** Written for someone picking this up with zero prior context. **Read
+the START HERE block below first** — it is the only section guaranteed current;
+everything after it is dated record.
 
 ---
 
-## 🟢 START HERE — state as of 2026-08-16, bake-off CLOSED
+## 🛑 START HERE — state as of 2026-08-16. ENGINEERING TRACK PARKED.
 
-**Presidio is SHIPPED and running. The GLiNER bake-off is COMPLETE and the
-verdict is NO-SHIP AS-IS.** Nothing is broken, nothing is half-applied, and
-nothing is mid-flight. **There is no work in progress** — the next thing is a
-new plan, not the resumption of an old one.
+**Presidio is SHIPPED and running. Overlap-aware suppression is COMPLETE and
+green. The engineering track is CONVERGED and PARKED.** Nothing is broken,
+nothing is half-applied, nothing is mid-flight.
+
+⛔ **NOTHING FURTHER RUNS ON THE SCRUBBER UNTIL DIRECTION RETURNS.** The open
+question is no longer an engineering one — **batch-as-union is a PRODUCT
+decision, escalated to Teru.** Do not open a successor plan, do not add
+glossary entries, do not resume GLiNER work. See the lever ledger below: the
+levers were enumerated, measured, and closed.
 
 ```
 deployment   daedcfe9342d21a7   running 1.2.3 (presidio), read back and VERIFIED
-origin       2ff5802            deploy/aicore-poc — IN SYNC, nothing unpushed
-images       ghcr.io/.../1.2.3                          <- what is deployed
-             pii-scrubber:gliner-cand@sha256:d96edef4…  <- measured candidate, LOCAL
-             pii-scrubber:gliner-cand-prefix-2026-08-16 <- pre-fix, reproduces the
-                                                           Task 0 baseline
+origin       4b4d68c            deploy/aicore-poc — IN SYNC, nothing unpushed
+images       ghcr.io/.../1.2.3                              <- what is deployed
+             pii-scrubber:gliner-cand@sha256:73994cfc…      <- LOCAL, overlap-suppression
+                                                               candidate, git_sha d5b02f1
+             pii-scrubber:gliner-cand-preovlp-2026-08-16    <- the bake-off's artifact
+             pii-scrubber:gliner-cand-prefix-2026-08-16     <- pre-_merge-fix
 ```
 
 ⚠️ **No registry push grant exists.** It was granted for 1.2.3 and **revoked**;
@@ -29,13 +35,80 @@ verification. See "Settled".
 
 ### What to do first, if you are new here
 
-1. Read **"The GLiNER bake-off result"** below — it is the finding, in one
-   screen, and it explains why the obvious next step is not the right one.
-2. The current position is queue item **4: overlap-aware suppression.** It is a
-   **detection change**, so it needs its own plan, its own Gate 0 and its own
-   pre-registration before any code moves. Do not start it as a patch.
-3. Everything else is either held (blind batch v4), queued in parallel
-   (mechanism-claims audit), or deferred by decision (credential rotation).
+1. Read **the lever ledger** immediately below. It is the finding, in one
+   screen, and it is why there is no obvious next engineering step.
+2. **There is no queued engineering work.** The scrubber is parked. If you
+   were sent here to "improve batch", the answer is that it is a product
+   decision awaiting Teru, not a task.
+3. Everything else is either held (blind batch v4, union release), queued but
+   independent (mechanism-claims audit), or deferred by decision (credential
+   rotation).
+
+### 🧾 LEVER LEDGER — CLOSED 2026-08-16. No lever reaches presidio's 2/21.
+
+The batch path is blocked on **control damage**: how many of the 21 zero-PII
+control samples the engine damages. presidio alone damages **2 of 21 (9.5%)**.
+Union damaged **8**. Every candidate lever was enumerated and measured.
+
+| Lever | Control damage | Status |
+|---|---|---|
+| **Overlap-aware suppression** (ALL-TOKENS) | 8 → **7** | ✅ **SHIPPED to the candidate.** All gates exact, both-directions green |
+| **Per-type thresholds for GLiNER** | — | ⛔ **OUT, measured.** Over-detections and true positives interleave: ORG_NAME 21/33, PERSON 10/13, ADDRESS 2/4 score ≥ the lowest true positive. `Buyer` 0.994, `Customer` 0.882 — **GLiNER is confidently wrong** |
+| **Label subset** (`person` + `physical address` only) | 7 → **6** | ⛔ **OUT, derived.** It **relocates** the damage: 11 presidio spans return, all real cities and nationality adjectives — the class `glossary.txt` rejected on the record. Also risks `holdout_v3` recall (48/50–50/50, bounded) |
+| **Glossary vocabulary** | 7 → **4** ceiling | ⛔ **Ceiling, not a fix.** Per-entry observed-misfire burden, and **capped by ALL-TOKENS**: suppressing `plant 4000` needs *both* tokens as entries, and bare numerics (`4000`, `0001`, `4100`) collide with customer numbers so they can never be added |
+| **presidio alone** | **2 of 21** | the bar none of the above reaches |
+
+**The two survivors are not additive in the obvious way** — the label subset
+deletes the ORG_NAME spans vocabulary would target while returning a class
+vocabulary is barred from touching.
+
+⛔ **Therefore: batch-as-union is a PRODUCT decision, not an engineering one.**
+Whether ~4–7 damaged controls in 21 is acceptable for KB text is a question
+about the product's tolerance, and no further measurement changes it.
+**Escalated to Teru 2026-08-16.**
+
+Full derivation, with the exact/bounded boundary marked per cell:
+`OVERLAP-SUPPRESSION-RUNLOG.md` Appendix.
+
+### ✅ Overlap-aware suppression — COMPLETE 2026-08-16, gates exact
+
+`GATE0-overlap-suppression-plan.md`, Gate 0 answered, Tasks 0–6 closed at the
+review gate. **Suppression used to compare the WHOLE span text against
+`ALLOWLIST_EXACT`**, so GLiNER's multi-word spans could never match a
+single-word entry. It now suppresses a span when **every** token is
+independently suppressible and every token clears the ±40-char backstop **at
+its own offsets**.
+
+⛔ **"Contains a protected token" was disqualified by measurement, permanently.**
+Protected tokens live inside real values — `PO` inside `PO Box 91020,
+Auckland`, `Rise` inside `44 Bellbird Rise`. Whole-span containment exposed
+**three planted ADDRESS values, two on the presidio path**, i.e. a leak in
+shipped configuration. `test_overlap_suppression.py` §3 carries the rejected
+rule verbatim and proves it drops those spans, so the safety assertions cannot
+pass vacuously.
+
+| | Registered | Measured |
+|---|---|---|
+| Control recall | `108/111` · `65/68` · `45/50` · selftest `100.0/45-45/od 4/49` | identical, leak lists line-by-line |
+| Control over-detections | 31 → **30** | exactly `HO-028 'FSD ZMM_VENDOR_PORTAL'`, none added |
+| Union recall | `111/111` · `68/68` · `50/50` | identical |
+| Union over-detections | 76 → **74** | exactly `HO-028` + `HO-029`, none added |
+| Controls damaged | 8 → **7 of 21** | 7, repaired `HO-029`, none newly damaged |
+
+**S1–S8 all silent.** Six registered suites unmoved (16 · 39 · 33 · 74 · 29 ·
+37), monotonicity re-proved, determinism span-for-span identical including
+scores. Pod fitness unchanged (p50 695 ms, batch 48.2 s, RSS 2.066 GiB — all
+**emulated upper bounds**, never the pod's).
+
+⚠️ **7 of 21 is never to be reported without presidio's 2 of 21 beside it.**
+Pre-stated at Gate 0 as Q9, before the run, precisely so a 38%→33% move could
+not be read afterwards as an unblocking.
+
+**New in the repo:** `jargon_suppression_samples.json` (24 samples, committed,
+openly readable, authored **before** the rule so it could be developed off the
+burned sets) · `test_overlap_suppression.py` (38 checks) ·
+`score_distribution.py` · `OVERLAP-SUPPRESSION-RUNLOG.md` ·
+`READABILITY-SAMPLES.md` regenerated across all 21 controls.
 
 ⚠️ **One open item on the human's side:** the `ServingTemplate` in the
 git-synced `workflows/` path gained `OMP_NUM_THREADS=1` / `MKL_NUM_THREADS=1`
@@ -164,16 +237,21 @@ never here.
    AS-IS.** Tasks 0–7 all run and closed at the review gate. Full record:
    `TASK6-SYNTHESIS.md`, `BAKEOFF-RUNLOG.md`, and §13 of the plan. Summary
    below under "The GLiNER bake-off result".
-4. **← YOU ARE HERE. Overlap-aware suppression** — a **detection change**, so
-   its own plan, its own Gate 0, its own pre-registration, and the readability
-   measurement re-run against the fixed candidate. It is the single named
-   blocker between here and a union release.
-5. **Then, only if it rescues batch:** one union release, **both paths in a
-   single cutover**. Pod latency measured at its verification, presidio
+4. ✅ ~~Overlap-aware suppression~~ — **COMPLETE 2026-08-16, gates exact.**
+   `GATE0-overlap-suppression-plan.md` + `OVERLAP-SUPPRESSION-RUNLOG.md`.
+   ⚠️ **It did NOT rescue batch and was pre-registered not to be assumed to:**
+   controls damaged 8 → 7 of 21 against presidio's 2. Necessary, not
+   sufficient. See the lever ledger in START HERE.
+5. ⛔ **Union release — HELD, and its premise has NOT fired.** It was
+   conditioned on item 4 rescuing batch. It did not. **Do not open it** until
+   the product decision returns. If it ever runs: one release, **both paths in
+   a single cutover**, pod latency measured at its verification, presidio
    fallback pre-stated. ⛔ **Live-first split shipping was considered and
    DECLINED** — it needs a per-request engine mode that does not exist
    (`ENGINE` is process-wide), so it buys new surface plus a second cutover for
    half the win, and the half whose gate is the one still unmeasured.
+5b. 🛑 **← YOU ARE HERE. Nothing runs.** The engineering track is converged and
+   parked; batch-as-union is escalated to Teru as a **product** decision.
 6. **Mechanism-claims audit** (executor) — still queued, authorized, its own
    scoped session. Ledger every claim of mechanism here as *exercised /
    observed / asserted, never executed*, then scratch-container probes for the
@@ -181,7 +259,30 @@ never here.
 7. **Blind batch v4** (reviewer) — ⛔ **HELD.** It **sizes an open leak**; it
    does not verify a fix. Runs **once**, against the **deployed union
    release**, at its verification. **Not before**, and ⛔ **never a tuning
-   corpus** — see "Settled".
+   corpus** — see "Settled". ⚠️ Its target now depends on a product decision
+   that has not been made: if batch never ships as union, v4 measures the
+   presidio configuration.
+
+### 📒 Open items ledger — carried, not queued
+
+Neither is scheduled work. Both are recorded so they are not rediscovered.
+
+- **Cue-list boundary gaps — promotion-side, own evidence burden.** Surfaced
+  by `jargon_suppression_samples.json`, pinned as KNOWN in
+  `test_overlap_suppression.py` §4 so a change in either direction is visible.
+  `approved by` and `countersigned by` are **not** in the frozen
+  `_USER_CONTEXT_RE` cue list (`approver` is), so a person named `Payer` or
+  `Way` is suppressed by the glossary and leaks. ⚠️ **This is promotion, not
+  suppression** — widening the cue list makes the scrubber redact *more*, and
+  it needs its own both-directions evidence exactly as suppression did. It was
+  deliberately **not** fixed inside the suppression plan.
+- **BPA reviewer-restore token map — unchanged, still attached to the union
+  release.** Batch mode returning a token map so a human gate can RESTORE
+  over-redacted jargon. ⚠️ **The lever ledger makes this more load-bearing,
+  not less:** if the product decision accepts union on batch, a restore step
+  is the only remaining mitigation for the residual 7-of-21, because no
+  engineering lever reaches presidio's 2. Raise it before the BPA flow is
+  designed.
 
 ⚠️ **Not queued, deliberately:** more review rounds. 1.2.2 and 1.2.3 changed
 zero detection between them and the blind figure has not moved since the
