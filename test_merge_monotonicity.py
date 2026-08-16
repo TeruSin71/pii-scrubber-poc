@@ -161,6 +161,53 @@ for name, (base, added) in cases.items():
     check(f"{name}: output non-overlapping", non_overlapping(union_out))
 
 # --------------------------------------------------------------------------
+print("\n2b. COALESCING -- contiguous same-type only, never a gap, never a type")
+# --------------------------------------------------------------------------
+# Remedy B. Coalescing changes how coverage is PRESENTED, never what it is,
+# so each case asserts the resulting span layout, not just the coverage set.
+def layout(spans):
+    return [(s["start"], s["end"], s["type"]) for s in spans]
+
+
+# LEFT: remainder lands immediately after a kept span of the same type.
+# [0,10) PERSON wins on length; [5,14) PERSON is reduced to [10,14) and must
+# be absorbed, giving one span rather than two adjacent ones.
+out = A._merge([span(0, 10, "PERSON", 0.9), span(5, 14, "PERSON", 0.8)])
+check("coalesce LEFT: two contiguous PERSON spans become one",
+      layout(out) == [(0, 14, "PERSON")], f"got {layout(out)}")
+check("coalesce LEFT: text is reassembled in order",
+      out[0]["text"] == "x" * 14, f"got {out[0]['text']!r}")
+
+# RIGHT: remainder lands immediately before a kept span of the same type.
+out = A._merge([span(10, 20, "PERSON", 0.9), span(4, 12, "PERSON", 0.8)])
+check("coalesce RIGHT: remainder before a kept span merges into it",
+      layout(out) == [(4, 20, "PERSON")], f"got {layout(out)}")
+
+# BETWEEN: remainder exactly fills the gap between two same-type spans.
+out = A._merge([span(0, 10, "PERSON", 0.95), span(14, 24, "PERSON", 0.94),
+                span(8, 16, "PERSON", 0.5)])
+check("coalesce BETWEEN: a remainder filling a gap joins both neighbours",
+      layout(out) == [(0, 24, "PERSON")], f"got {layout(out)}")
+
+# CROSS-TYPE: must NOT coalesce -- a merged span would mislabel part of itself.
+out = A._merge([span(0, 10, "PERSON", 0.9), span(5, 14, "ADDRESS", 0.8)])
+check("cross-type does NOT coalesce: fragments stay separate",
+      layout(out) == [(0, 10, "PERSON"), (10, 14, "ADDRESS")],
+      f"got {layout(out)}")
+
+# NO GAP BRIDGING: same type, but not contiguous -- must stay two spans.
+out = A._merge([span(0, 10, "PERSON", 0.9), span(20, 30, "PERSON", 0.9)])
+check("no gap bridging: same-type spans with a gap stay separate",
+      layout(out) == [(0, 10, "PERSON"), (20, 30, "PERSON")],
+      f"got {layout(out)}")
+
+# Coalescing must never invent coverage.
+before = covered([span(0, 10, "PERSON"), span(20, 30, "PERSON")])
+after = covered(A._merge([span(0, 10, "PERSON", 0.9), span(20, 30, "PERSON", 0.9)]))
+check("coalescing adds no character that no span claimed",
+      after == before, f"{sorted(after - before)} invented")
+
+# --------------------------------------------------------------------------
 print("\n3. PROPERTY TEST -- random geometries, not hand-picked examples")
 # --------------------------------------------------------------------------
 # The bug is a GEOMETRY CLASS. Examples do not cover a class, so the geometries
@@ -262,19 +309,46 @@ for fn, text in texts:
     old_out = _merge_prefix([dict(s) for s in raw])
     key = lambda L: [(s["start"], s["end"], s["type"], s["text"]) for s in L]
     if key(new_out) != key(old_out):
-        differing.append((fn, text[:70], key(old_out), key(new_out)))
+        # Store the FULL text. An earlier version stored text[:70] and the
+        # marker check failed on a correct fix, because the value it looks for
+        # sits at offset 93 -- the harness truncated away the evidence it was
+        # about to assert on. Truncation happens at print time only.
+        differing.append((fn, text, key(old_out), key(new_out)))
 
 print(f"     {len(texts)} corpus samples, presidio spans only")
-check("presidio-only output is BYTE-IDENTICAL to the pre-fix implementation",
-      not differing,
-      f"{len(differing)} samples differ -- LATENT DEFECT STOP per plan 5.1")
-if differing:
-    print("\n  ⛔ LATENT-DEFECT STOP -- the fix moved the presidio path.")
-    print("     Per plan 5.1 this is NOT noise: it is the fix revealing that")
-    print("     shipped code was already losing coverage. Report against the")
-    print("     deployed 1.2.3 with the geometry per value.")
+
+# RE-PINNED at Gate 0 after remedy B, 2026-08-16. Byte-identity is NOT
+# achievable on a sample where the defect actually fires -- any true fix
+# changes it. So the registration is EXACTLY ONE delta, named, with its new
+# output recorded verbatim below. A second delta is a STOP: it would mean the
+# fix reaches presidio spans somewhere nobody has looked at.
+EXPECTED_DELTAS = 1
+HO012_MARKER = "Fields & Sons Pty"
+# The pre-fix layout lost character 110, a period, because [102,111)
+# 'Sons Pty.' was dropped whole for overlapping [93,110) 'Fields & Sons Pty'.
+HO012_PREFIX_LAYOUT = (93, 110, "ORG_NAME", "Fields & Sons Pty")
+HO012_POSTFIX_LAYOUT = (93, 111, "ORG_NAME", "Fields & Sons Pty.")
+
+check(f"exactly {EXPECTED_DELTAS} presidio-only delta (re-pinned post-B)",
+      len(differing) == EXPECTED_DELTAS,
+      f"{len(differing)} samples differ -- more than one is a STOP per Gate 0")
+
+if len(differing) == EXPECTED_DELTAS:
+    fn, t, old, new = differing[0]
+    check("the single delta is HO-012 'Fields & Sons Pty'",
+          HO012_MARKER in t, f"unexpected sample: {t!r}")
+    check("pre-fix layout is the recorded one (period LOST)",
+          HO012_PREFIX_LAYOUT in old, f"got {old}")
+    check("post-fix layout is the recorded one (period COVERED, ONE span)",
+          HO012_POSTFIX_LAYOUT in new, f"got {new}")
+    print(f"     recorded delta [{fn}]:")
+    print(f"        pre-fix : {HO012_PREFIX_LAYOUT}")
+    print(f"        post-fix: {HO012_POSTFIX_LAYOUT}")
+    print("        -> scrubbed output '<ORG_NAME>.' becomes '<ORG_NAME>'")
+elif differing:
+    print("\n  ⛔ STOP -- more presidio-only deltas than the one registered.")
     for fn, t, old, new in differing[:5]:
-        print(f"     [{fn}] {t!r}")
+        print(f"     [{fn}] {t[:70]!r}")
         print(f"        pre-fix : {old}")
         print(f"        post-fix: {new}")
 

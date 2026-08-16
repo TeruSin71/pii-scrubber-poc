@@ -634,9 +634,52 @@ def _merge(spans: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             piece = dict(s)
             piece["start"], piece["end"] = a, b
             piece["text"] = s["text"][a - s["start"]:b - s["start"]]
-            kept.append(piece)
+            _absorb(kept, piece)
     kept.sort(key=lambda s: s["start"])
     return kept
+
+
+def _absorb(kept: List[Dict[str, Any]], piece: Dict[str, Any]) -> None:
+    """Add `piece`, coalescing it into a CONTIGUOUS span of the SAME type.
+
+    Without this, a remainder emitted next to the span that outranked it comes
+    out as a second token: 'Fields & Sons Pty.' rendered '<ORG_NAME><ORG_NAME>'
+    rather than '<ORG_NAME>'. Observed on HO-012, where presidio produces
+    [93,110) 'Fields & Sons Pty' and [102,111) 'Sons Pty.' -- the second is
+    reduced to the single character the first does not cover, a period.
+    Splitting a value into two adjacent tokens protects nothing extra and
+    costs readability on the batch path, where the text must stay usable.
+
+    TWO DELIBERATE LIMITS, both from the Gate 0 ruling:
+
+    * CONTIGUOUS ONLY -- `end == start` exactly. Gaps are never bridged, so
+      coalescing can never redact a character no span claimed. It rewrites
+      how coverage is PRESENTED, never what it is.
+    * SAME TYPE ONLY -- a cross-type remainder stays its own fragment. Merging
+      ADDRESS into ORG_NAME would emit a span whose label is wrong for part of
+      its own extent, which is worse than two honest tokens.
+
+    ⚠️ Attribution caveat for the bake-off: a coalesced span keeps the
+    ABSORBING span's `engine`. In union mode a presidio span that absorbs a
+    GLiNER remainder is still labelled `presidio`, so per-engine over-redaction
+    counts read the absorber. Irrelevant in single-engine modes.
+    """
+    left = next((k for k in kept if k["type"] == piece["type"]
+                 and k["end"] == piece["start"]), None)
+    right = next((k for k in kept if k["type"] == piece["type"]
+                  and k["start"] == piece["end"]), None)
+    if left is not None and right is not None:
+        left["text"] = left["text"] + piece["text"] + right["text"]
+        left["end"] = right["end"]
+        kept.remove(right)
+    elif left is not None:
+        left["text"] = left["text"] + piece["text"]
+        left["end"] = piece["end"]
+    elif right is not None:
+        right["text"] = piece["text"] + right["text"]
+        right["start"] = piece["start"]
+    else:
+        kept.append(piece)
 
 
 def scrub(text: str, mode: str = "batch") -> Dict[str, Any]:
