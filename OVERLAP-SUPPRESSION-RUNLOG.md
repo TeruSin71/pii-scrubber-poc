@@ -240,3 +240,103 @@ either.
 **What this hands on:** the union release inherits a re-frozen sha-stamped
 candidate and the union gates above, **and inherits the batch blocker
 unchanged**. Blind batch v4 stays HELD for that release's verification.
+
+---
+
+## Appendix — label-subset counterfactual, DERIVED OFFLINE 2026-08-16
+
+Directed at the Task 6 gate, before any successor plan is written. Counterfactual:
+**union with `GLINER_LABELS` reduced to its unique-value labels**
+(`person`, `physical address`), so GLiNER may only emit `PERSON` / `ADDRESS`.
+
+**No runs, no code, no corpus exposure.** Derived from
+`bakeoff-spans-presidio-ovlp.json`, `bakeoff-spans-both-ovlp.json` and
+`score-distribution-both-ovlp.json`, all already on disk.
+
+⚠️ **The dumps itemise over-detections in full but record on-value spans only
+as counts.** Over-redaction and control damage are therefore derived
+**exactly**; recall is derived through the presidio-miss frame and is exact
+except where a removed label is the only cover. **Every bounded cell is a
+range, never a point estimate.**
+
+### Control damage — the metric batch is blocked on
+
+| | Damaging spans | Under the subset |
+|---|---|---|
+| `HO-015` | `plant`(g/ORG) `4000`(g/CUST) **`customer`(g/PERSON)** | still damaged |
+| `HO-021` | **`config knowledge`(p/PERSON)** | still damaged |
+| `TKT-0009` | **`customer`(g/PERSON)** | still damaged |
+| `V2-064` | **`storage location 0001`(g/ADDRESS)** `plant 4000`(g/ORG) | still damaged |
+| `V3-033` | `plant 4100`(g/ORG) | ✅ **repaired** |
+| `V3-034` | **`400000`(p/CUSTOMER_NO)** | still damaged |
+| `V3-040` | `VF04 collective run`(g/ORG) **`header level`(g/ADDRESS)** | still damaged |
+
+> **DERIVED: 7 → 6 of 21.** presidio alone is **2 of 21**. No returning
+> presidio span lands on a control, so this cell is exact.
+
+### Over-redaction
+
+GLiNER over-detections 54 → **17** retained (PERSON 13 + ADDRESS 4); 37
+dropped (ORG_NAME 33, IBAN/CUSTOMER_NO/PHONE/USER_ID 1 each). But **11
+presidio over-detections currently lose the merge to a GLiNER span and can
+return**:
+
+```
+Wellington · Auckland · the Christchurch DC · Brazilian · Australian ×2
+Dutch · German · Hanoi · EU · Sydney DC
+```
+
+> **DERIVED: 74 → 37–48.** presidio alone is 30.
+
+⛔ **Every returning span is a real city or a nationality adjective — the exact
+class `glossary.txt` REJECTED on the record** (`Munich`, `Wellington`,
+`Auckland`, `Australian`, `Dutch`, `German`, `European`). **The label subset
+does not remove the over-redaction, it relocates it to a class the project has
+already decided vocabulary must not touch.**
+
+### Recall
+
+Exactly **11** planted values have no presidio coverage — the presidio-arm
+leak lists — and they are the only values whose recall depends on GLiNER.
+8 PERSON + 1 ADDRESS are retained labels, and the GLiNER arm leaked **zero**
+of either type, so all nine are recovered.
+
+| Corpus | Derived | |
+|---|---|---|
+| `holdout_samples` | `111/111` | EXACT |
+| `eval_samples_v2` | `68/68` | EXACT |
+| `holdout_v3` | **`48/50` – `50/50`** | **BOUNDED** — `5591230` / `6620945` sit behind the dropped `customer number` label |
+
+Only **1** GLiNER `CUSTOMER_NO` span sits on a planted value in the union, so
+at most one of the two is covered by that label and the other is covered by a
+span of a type the dumps do not record. ⚠️ **`holdout_v3` is the
+externally-authored corpus — a cost paid there is paid on the only
+blind-authored instrument this project has spent.**
+
+### Corollary — ALL-TOKENS caps what vocabulary can reach
+
+Derived by inspection of the same rows, and it is not obvious: **the semantics
+chosen for safety makes vocabulary harder, not easier.** Suppressing
+`plant 4000` under ALL-TOKENS needs **both** `plant` *and* `4000` as entries,
+and bare numerics (`4000`, `0001`, `4100`, `400000`) collide with customer
+numbers — they can never be added. Restricting vocabulary to non-numeric
+tokens repairs `HO-021`, `TKT-0009` and `V3-040` only:
+
+> **DERIVED ceiling for vocabulary alone: 7 → 4 of 21**, still double
+> presidio's 2, and each entry carries its own observed-misfire burden.
+
+### Verdict handed to the successor
+
+| Lever | Control damage | Cost |
+|---|---|---|
+| overlap-aware suppression (shipped) | 8 → **7** | none — gates exact |
+| per-type thresholds | — | ⛔ **measured OUT**: GLiNER's over-detections and true positives interleave |
+| label subset | 7 → **6** | relocates over-redaction to rejected place/nationality class; risks `holdout_v3` |
+| vocabulary, non-numeric only | 7 → **4** (ceiling) | per-entry evidence burden |
+| — | **presidio alone: 2 of 21** | |
+
+**No single lever reaches presidio's 2 of 21, and the two survivors are not
+additive in the obvious way** — the label subset removes the ORG_NAME spans
+that vocabulary would otherwise target, while returning a class vocabulary is
+barred from. The successor plan's real question is whether batch-as-union is
+reachable at all, not which of three levers to pull first.
