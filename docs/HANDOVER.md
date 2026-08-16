@@ -1,31 +1,54 @@
 # PII Scrubber — Handover
 
-**Last updated 2026-08-16, after the Rule 7 gate.** Written for someone picking this
-up with zero prior context. **Read the START HERE block below first** — it is
-the only section guaranteed current; everything after it is dated record.
+**Last updated 2026-08-16, after the GLiNER bake-off closed.** Written for
+someone picking this up with zero prior context. **Read the START HERE block
+below first** — it is the only section guaranteed current; everything after it
+is dated record.
 
 ---
 
-## 🟢 START HERE — state as of 2026-08-16, after the Rule 7 gate
+## 🟢 START HERE — state as of 2026-08-16, bake-off CLOSED
 
-**Presidio path is ACCEPTED and SHIPPED. GLiNER RUNS, the backend is DECIDED
-(torch), and the ship candidate is FROZEN.** Nothing is broken; nothing is
-half-applied. The next artifact is the **bake-off plan for Gate 0**; until that
-plan is reviewed, **nothing builds and nothing touches the deployment.**
+**Presidio is SHIPPED and running. The GLiNER bake-off is COMPLETE and the
+verdict is NO-SHIP AS-IS.** Nothing is broken, nothing is half-applied, and
+nothing is mid-flight. **There is no work in progress** — the next thing is a
+new plan, not the resumption of an old one.
 
 ```
-deployment   daedcfe9342d21a7   running 1.2.3, read back and VERIFIED
-origin       529e590            deploy/aicore-poc — IN SYNC, nothing unpushed
-ship cand.   pii-scrubber:gliner-cand    FROZEN at b5fbaf6's build, LOCAL ONLY
-images       pii-scrubber:gliner-spike   <- superseded, safe to delete
-             ghcr.io/.../1.2.3           <- what is actually deployed
+deployment   daedcfe9342d21a7   running 1.2.3 (presidio), read back and VERIFIED
+origin       2ff5802            deploy/aicore-poc — IN SYNC, nothing unpushed
+images       ghcr.io/.../1.2.3                          <- what is deployed
+             pii-scrubber:gliner-cand@sha256:d96edef4…  <- measured candidate, LOCAL
+             pii-scrubber:gliner-cand-prefix-2026-08-16 <- pre-fix, reproduces the
+                                                           Task 0 baseline
 ```
 
 ⚠️ **No registry push grant exists.** It was granted for 1.2.3 and **revoked**;
 grants are per-release, exact-tag, at the publish step, expiring on digest
 verification. See "Settled".
 
+### What to do first, if you are new here
+
+1. Read **"The GLiNER bake-off result"** below — it is the finding, in one
+   screen, and it explains why the obvious next step is not the right one.
+2. The current position is queue item **4: overlap-aware suppression.** It is a
+   **detection change**, so it needs its own plan, its own Gate 0 and its own
+   pre-registration before any code moves. Do not start it as a patch.
+3. Everything else is either held (blind batch v4), queued in parallel
+   (mechanism-claims audit), or deferred by decision (credential rotation).
+
+⚠️ **One open item on the human's side:** the `ServingTemplate` in the
+git-synced `workflows/` path gained `OMP_NUM_THREADS=1` / `MKL_NUM_THREADS=1`
+(authorized, Q3). The running pod is **not** re-driven by that, and the next
+deployment inherits the caps by design — but the sync state has **not** been
+read back. Teru, one look in AI Launchpad.
+
 ### ✅ The Rule 7 decision — MADE 2026-08-16. Backend is torch, ONNX deferred.
+
+⚠️ **Historical from here to the end of this block.** The decision stands and
+the ONNX arm is still deferred, but the work it unblocked is finished — see the
+bake-off result below. Kept because it records **why there is no ONNX arm**,
+which is the first question anyone re-opening this will ask.
 
 Recorded as **verbatim, dated, attributed** words per the "Settled" rule, not
 as the executor's paraphrase. **Reviewer session (Claude Cowork), relayed by
@@ -101,19 +124,23 @@ huggingface_hub==0.36.2      transformers==4.57.6
 ```
 
 GLiNER loads, runs, and `SCRUBBER_ENGINE=both` no longer takes the pod down.
-Detail lives in the sections below: pod-fitness gates, the tokenizer
-arbitration, and the ONNX blocker.
+**The pin above is still current and still load-bearing** — raise either half
+and GLiNER stops loading.
 
-**The headline from the gates: memory is fine, latency is the problem.**
-On the real pod shape (`--cpus=1 --memory=3g`, threads capped) GLiNER is
-**~113× slower per request** than presidio — p50 678 ms vs 6 ms, a 65-sample
-batch 47.6 s vs 0.5 s, and 4-way concurrency *degrades* to 0.48×. Peak RSS
-2.18 GiB of 3 GiB with 823 MiB headroom after a stressed run: **no OOM.**
+⚠️ **The pod-fitness numbers that used to sit here are SUPERSEDED.** They were
+taken before the Task 1 rebuild and are within noise of the bake-off's own
+figures, but two numbers in the same document describing the same gate is how
+this project has been misquoted before. **The authoritative measurements are in
+"The GLiNER bake-off result" below**, taken on the artifact that was actually
+measured (`gliner-cand@sha256:d96edef4…`). The one-line summary is unchanged:
+**memory is fine, latency is the problem, and neither latency bound is the
+pod's answer.**
 
-⚠️ **Do not quote 678 ms or 44 ms as the pod's latency.** 678 ms is emulated
-amd64-on-ARM (upper bound); 44 ms was native but many-core (lower bound).
-**Native amd64 on one vCPU is unmeasured and is the only figure that decides
-the live path.**
+⚠️ **Do not quote any local latency figure as the pod's.** Every number this
+project holds is either emulated amd64-on-ARM (upper bound) or native
+many-core (lower bound). **Native amd64 on one vCPU is unmeasured**, and per
+the Rule 7 decision it is measured on the pod at a release's verification step,
+never here.
 
 ### What was delivered
 
@@ -121,9 +148,10 @@ the live path.**
 |---|---|
 | Service | Presidio + 9 custom SAP recognizers, inside the compliance boundary. No third-party model sees raw data |
 | Deployed | `pii-scrubber:1.2.3`, deployment `daedcfe9342d21a7`, verified end to end |
-| **Quotable figure** | **90.0% blind** (`holdout_v3`, externally authored, run once, zero novel failure classes) |
+| **Quotable figure** | **90.0% blind** (`holdout_v3`, externally authored, run once, zero novel failure classes) — ⚠️ **still the only one.** The bake-off produced no quotable number and could not have |
 | Benchmark | 97.3% — **burned, regression-only, never quotable** |
 | For management | `holdout-evaluation-report.html`, `scrubber-options-for-management.html` — ready, local-only |
+| GLiNER | measured, **not shipped**. Verdict NO-SHIP AS-IS, see the result below |
 
 ### Queued, in order
 
@@ -523,7 +551,17 @@ and **hard-fails if it is not actually offline**. Verified: passes offline,
 fails loudly online. Together with the `transformers==4.57.6` pin, that is
 what holds the finding in place.
 
-### 📊 GLiNER pod-fitness gates — measured 2026-08-16 on the POD shape
+### 📊 GLiNER pod-fitness gates — PRE-REBUILD record, SUPERSEDED 2026-08-16
+
+⚠️ **These numbers describe `gliner-cand` BEFORE the Task 1 rebuild** (now
+tagged `pii-scrubber:gliner-cand-prefix-2026-08-16`). The bake-off re-measured
+every one of them on the artifact it actually tested, and the current figures
+are in **"The GLiNER bake-off result"** near the top. They agree within noise —
+p50 678 → 688 ms, batch 47.6 → 48.0 s, concurrency 0.48 → 0.51×, RSS 2.18 →
+2.10 GiB — so nothing here is *wrong*. It is simply not the record to quote,
+and **two live figures for one gate is how a document starts disagreeing with
+itself.** Kept because it is the measurement that justified the Rule 7
+decision.
 
 `--cpus=1 --memory=3g`, `OMP_NUM_THREADS=1`, image `pii-scrubber:gliner-cand`,
 against all 158 real corpus samples. **This is the Starter plan's actual
