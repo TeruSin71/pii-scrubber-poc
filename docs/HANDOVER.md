@@ -105,6 +105,53 @@ commits earlier without anyone noticing. Its assertions were proved by
 each file restored byte-identical — because a check that has never failed is
 a check that has not been shown to work.
 
+### ⛔ 1.2.3 is CLOSED. What comes next, in this order.
+
+Set at review, 2026-08-16. **Two pieces run in parallel; the recognizer plan
+starts only when both are in.**
+
+```
+  ┌─ AUDIT  (executor)  ─────────────┐
+  │  HANDOVER mechanism-claims       │
+  │  ledger                          ├──►  RECOGNIZER PLAN
+  ├─ BLIND BATCH v4  (reviewer)  ────┤     Gate 0, informed by both
+  │  now DUE — 1.2.3 is deployed     │
+  │  and verified, target exists     │
+  └──────────────────────────────────┘
+```
+
+**1. The mechanism-claims audit — its own scoped session, executor.**
+Authorized because *two consecutive rounds found the previous round's central
+factual claim wrong*: the FAC incidence probe measured the wrong layer, and the
+ORG precedent never fires. Both were written here as settled, in confident
+prose. The corrections are good news; the base rate is not.
+
+Deliverable: a **ledger of every claim of mechanism in this document**, each
+tagged with its evidence class —
+
+| Class | Meaning |
+|---|---|
+| **exercised** | a test actually runs this path |
+| **observed** | measured once, on the record, but nothing guards it |
+| **asserted, never executed** | written down as how it works; no evidence anyone ran it |
+
+Then **scratch-container probes for the third bucket** — the bucket both of
+this project's recent errors came from. Not one release at a time; all at once,
+deliberately.
+
+**2. Blind batch v4 — reviewer, now due.** Purpose reframed: it **sizes an
+open leak**, it does not verify a fix. Its number feeds the recognizer plan's
+justification. Salting spec in `REVIEW-1.2.4-session.md` §7.2.
+
+**3. Recognizer plan Gate 0** — written only after both land, and opening with
+the Phase 0 spike below.
+
+⚠️ **Not in this sequence, and deliberately:** more review rounds. 1.2.2 and
+1.2.3 changed **zero detection** between them, and the blind figure has not
+moved since the 1.2.0-era measurement. That was correct for what those releases
+were, but the loop had started feeding on itself. The audit is the last piece of
+inward-facing work before something that can move a number.
+
 ### ⛔ Why item 3 was withdrawn — the finding this release actually produced
 
 **`FAC` never reaches `LABEL_MAP`.** It is dropped a layer earlier:
@@ -208,6 +255,31 @@ change; the re-registration is dead code kept for presidio versions where the
 entity is missing. **So the FAC change would be the first time that path ever
 fires, not a repeat of a proven one.** Same error shape as the release that
 produced this note: a mechanism assumed to work because code for it exists.
+
+**Independently confirmed at the pin by review, 2026-08-16.** Facts 1-3 are
+not the executor's word alone.
+
+### 🔬 Phase 0 of the recognizer plan — mechanism-selection spike, REQUIRED
+
+Directed at review, 2026-08-16. **Before any pre-registration is written**,
+execute **both** candidate paths in a **scratch container** and observe which
+one actually puts a `FAC` span through `scrub()`:
+
+| Candidate | Mechanism |
+|---|---|
+| A | Add `FAC` as a **`NerModelConfiguration` mapping key**, so the entity becomes a mapping value and the registry-built recognizer supports it by the normal route |
+| B | **Re-register `SpacyRecognizer`** with `FAC` appended to `supported_entities` — the path §4.1 just proved is dead code today |
+
+Neither is assumed. Both are executed, both results recorded, and the winner
+is chosen on observed `scrub()` output — **not** on which one looks analogous
+to something already in the codebase. That reasoning is exactly what produced
+item 3 and the dormant-precedent error.
+
+Two further requirements of that plan, both non-negotiable:
+
+- **Modelling `supported_entities` in `unmapped_labels()` is a REQUIRED
+  item**, not an optional tidy-up. It is the fence in "Settled" coming down.
+- The spike runs in a **scratch container, never against the live pod**.
 
 ⚠️ **`fac_probe_validation.md`'s "0 of 12 control fires" is NOT safety
 evidence for that change.** `FAC` could not fire on any line, so the controls
@@ -384,6 +456,32 @@ was caught but typed `ORG_NAME` — redacted, mistyped, log only.
   protects. Governance decision, not an engineering shortcut.
 - **`holdout_samples.json` is gitignored on purpose.** A holdout anyone can read
   while tuning is not a holdout. Same for the two HTML reports.
+- ⛔ **No permission is granted as a side effect of the executor being
+  blocked.** A blocked action is a decision point, not an obstacle to route
+  around. Established 2026-08-16 after the 1.2.3 registry push: the harness
+  refused the push, the executor asked for a grant mid-release to save a round
+  trip, and the project's trust boundary moved without review. Scoping it to
+  one repository limited the blast radius but did not make it a reviewed
+  decision. **If an action is blocked, report it and stop** — the correct
+  outputs are a decision request or a command the human runs, never a
+  standing capability acquired in passing.
+- ⛔ **Publishing rights are per-release and expire on verification.** Registry
+  push is granted at the publish step, for **the exact tag being published**,
+  and **revoked once the digest is verified**. Never a wildcard, never
+  persistent across sessions. The 1.2.3 grant
+  (`Bash(docker push ghcr.io/terusin71/pii-scrubber:*)`) was **REVOKED** at
+  review; a wildcard that outlives its release is a standing capability
+  nobody re-authorised.
+- ⛔ **No automation consumes `unmapped_labels` until `supported_entities` is
+  modelled.** The field is a **superset of the leak list**, not the leak list —
+  it reports `["FAC"]` for a label that cannot reach the pipeline at all. It is
+  safe for a human reading `/v1/info`, because the payload now carries its own
+  semantics; it is **not** safe for a monitor, an alert, a dashboard or any
+  rule of the form "non-empty means a leak". 1.2.3 fixed the human reader and
+  left the machine reader wrong, deliberately and with the scope frozen.
+  **Modelling `supported_entities` is a REQUIRED item of the recognizer plan.**
+  If a machine reader appears before then, the trade flips and **the field
+  comes out** rather than being documented around.
 - **A registered number is re-pinned in the SAME COMMIT that moves it.** Any
   task that deliberately changes a pre-registered value updates the
   registration alongside the change, so **"registered" always means
