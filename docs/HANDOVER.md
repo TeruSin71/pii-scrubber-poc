@@ -1,48 +1,91 @@
 # PII Scrubber — Handover
 
-**Last updated 2026-08-16, end of session.** Written for someone picking this
+**Last updated 2026-08-16, after the Rule 7 gate.** Written for someone picking this
 up with zero prior context. **Read the START HERE block below first** — it is
 the only section guaranteed current; everything after it is dated record.
 
 ---
 
-## 🟢 START HERE — state as of 2026-08-16, end of session
+## 🟢 START HERE — state as of 2026-08-16, after the Rule 7 gate
 
-**Presidio path is ACCEPTED and SHIPPED. GLiNER now RUNS and is mid-evaluation,
-blocked on one Rule 7 decision.** Nothing is broken; nothing is half-applied.
+**Presidio path is ACCEPTED and SHIPPED. GLiNER RUNS, the backend is DECIDED
+(torch), and the ship candidate is FROZEN.** Nothing is broken; nothing is
+half-applied. The next artifact is the **bake-off plan for Gate 0**; until that
+plan is reviewed, **nothing builds and nothing touches the deployment.**
 
 ```
 deployment   daedcfe9342d21a7   running 1.2.3, read back and VERIFIED
-origin       1faf3e9            deploy/aicore-poc
-local HEAD   b5fbaf6            2 commits UNPUSHED (8003cac, b5fbaf6)
-images       pii-scrubber:gliner-cand    <- the GLiNER candidate, LOCAL ONLY
-             pii-scrubber:gliner-spike   <- superseded, safe to delete
+origin       529e590            deploy/aicore-poc — IN SYNC, nothing unpushed
+ship cand.   pii-scrubber:gliner-cand    FROZEN at b5fbaf6's build, LOCAL ONLY
+images       pii-scrubber:gliner-spike   <- superseded, safe to delete
              ghcr.io/.../1.2.3           <- what is actually deployed
 ```
-
-⚠️ **Two commits are unpushed and that is deliberate** — review-before-push.
-They are the tokenizer gate and the chmod/pod-fitness work, both GLiNER-only.
-Neither touches the presidio path or the running pod.
 
 ⚠️ **No registry push grant exists.** It was granted for 1.2.3 and **revoked**;
 grants are per-release, exact-tag, at the publish step, expiring on digest
 verification. See "Settled".
 
-### The decision that unblocks everything — Rule 7
+### ✅ The Rule 7 decision — MADE 2026-08-16. Backend is torch, ONNX deferred.
 
-GLiNER's evaluation cannot finish without an **ONNX arm**, and ONNX is
-unreachable at the current pin: `GLiNER.from_pretrained` has no ONNX
-parameter in `0.2.16`, and `optimum` (the export tooling) is not installed.
-`onnxruntime 1.28.0` already is, so that part costs nothing.
+Recorded as **verbatim, dated, attributed** words per the "Settled" rule, not
+as the executor's paraphrase. **Reviewer session (Claude Cowork), relayed by
+Teru, 2026-08-16.** Read "Option 3" as option **C** of the table that was put
+to review — the reviewer's own next sentence disambiguates it.
 
-| Option | Cost | Risk |
-|---|---|---|
-| **A — approve `optimum`** | one new dependency, export tooling only | Small. gliner and the hub pin stay untouched |
-| **B — upgrade `gliner`** | re-opens the whole finding-11 chain | High. gliner's unbounded `huggingface_hub>=0.21.4` is what broke it; the tokenizer arbitration would need re-running |
-| **C — drop the ONNX arm** | choose on torch alone | Then the missing input is a **native amd64 single-vCPU latency measurement**, which this Mac cannot produce |
+> Tokenizer gate: ACCEPTED, 8003cac. Warning adjudicated wrong by
+> measurement; offline hard-fail is a production-parity improvement.
+> chmod fix: ACCEPTED, b5fbaf6. 2.46 -> 1.51 GB; the KServe non-root
+> rationale is recorded reasoning, not just a diff.
+> Pod-fitness: memory gate CLOSED (2.18 GiB peak, stressed). Latency
+> honesty accepted: neither number is the pod's answer.
+>
+> ONNX: Option 3. The ONNX arm is struck from the current sequence and
+> recorded as deferred optimization (custom glue + equivalence testing,
+> or gliner upgrade with re-arbitrated pins and tokenizer gate re-run).
+> Backend = torch. Ship-candidate image freezes at b5fbaf6's build.
+>
+> Latency pre-registrations:
+> - Batch gate: PASSED at upper bound (47.6 s / 65 samples, emulated
+>   1 vCPU; batch path is async).
+> - Live gate: UNANSWERED, locally unanswerable. Measured on the pod at
+>   a GLiNER release's verification step. Fallback pre-stated: fail ->
+>   GLiNER batch-only, live stays presidio, residual returns to the
+>   management Local-LLM question.
+> - Live concurrency policy if ever adopted: single-flight only (0.48x
+>   measured).
+>
+> Push: 8003cac and b5fbaf6 AUTHORIZED (review-before-push satisfied).
+>
+> Next: bake-off plan for Gate 0 on the frozen torch candidate — three
+> modes, threshold policy never tuned on burned sets, per-engine and
+> per-path over-redaction metrics, corpus rules (burned = engineering
+> comparison + regression only; quotable requires fresh blind batch).
+>
+> Queue unchanged: mechanism-claims audit (executor), blind batch v4
+> (reviewer). Rotation: deferred by decision, trigger not fired.
 
-**Until one is chosen there is no backend choice and no frozen ship
-candidate**, and the bake-off plan cannot be written against a moving image.
+**Quoted in full, not excerpted** — a partial quote of an authorization is how
+one gets read as broader than it was.
+
+**What this changes, in the executor's words and marked as such:**
+
+- **There is a backend and a frozen image.** The bake-off plan is no longer
+  writing against a moving target, which is what blocked it.
+- **The `optimum` dependency question is closed without being taken.** No new
+  dependency, no gliner upgrade, so the finding-11 pin chain
+  (`huggingface_hub==0.36.2` + `transformers==4.57.6`) and the tokenizer
+  arbitration both stand untouched. Re-opening ONNX later re-opens both.
+- ⚠️ **Option C's known cost was accepted, not dodged.** This document recorded
+  that choosing C leaves a **native amd64 single-vCPU latency measurement** as
+  the missing input, and that this Mac cannot produce it. The decision answers
+  that rather than ignoring it: the live gate moves to **pod-time measurement
+  at a GLiNER release's verification step**, with the failure branch stated in
+  advance. **A pre-stated fallback is what keeps an unmeasurable gate from
+  becoming an unbounded one.**
+- **The batch gate is passed on the pessimistic figure**, so no better number
+  is needed for it. 47.6 s is the emulated-amd64 upper bound; the batch path is
+  async, so it is affordable there. **This does not transfer to the live path** —
+  see the two-bounds warning below.
 
 ### What GLiNER actually is now — measured, not assumed
 
@@ -84,14 +127,17 @@ the live path.**
 
 ### Queued, in order
 
-1. **Rule 7 decision above** — blocks the rest.
-2. **Bake-off plan for Gate 0 review.** Must pre-register: three modes
-   (presidio / gliner / union), threshold policy **never tuned on burned
-   sets**, per-engine over-redaction metrics, pod-fitness gates (compressed
-   size, memory, `--cpus=1` latency, **plus margin**), corpus rules — burned
-   sets are engineering comparison and regression **only**; a quotable number
-   requires a fresh blind batch. Plus this round's three additions: tokenizer
-   resolution recorded, `--cpus=1` latency gate, stressed memory gate.
+1. ✅ ~~Rule 7 decision~~ — **MADE 2026-08-16**, recorded above. Backend torch.
+2. **← YOU ARE HERE. Bake-off plan for Gate 0 review**, written against the
+   **frozen** torch candidate. Must pre-register: three modes (presidio /
+   gliner / union), threshold policy **never tuned on burned sets**,
+   **per-engine AND per-path** over-redaction metrics, pod-fitness gates
+   (compressed size, memory, `--cpus=1` latency, **plus margin**), corpus
+   rules — burned sets are engineering comparison and regression **only**; a
+   quotable number requires a fresh blind batch. Plus this round's three
+   additions: tokenizer resolution recorded, `--cpus=1` latency gate, stressed
+   memory gate. ⚠️ **Nothing builds and nothing touches the deployment until
+   this plan is reviewed.**
 3. **Mechanism-claims audit** (executor) — authorized, its own scoped session.
    Ledger every claim of mechanism here as *exercised / observed / asserted,
    never executed*, then scratch-container probes for the third bucket. Both
@@ -458,7 +504,17 @@ The 3 GB ceiling is not the blocker. Latency is.
 two builds (6.76 GB vs 1.51 GB); **only `docker save | gzip | wc -c` is
 trusted here.**
 
-### ⛔ ONNX is blocked in `gliner==0.2.16` — Rule 7 decision needed
+### ✅ ONNX — DECIDED 2026-08-16: struck from the sequence, deferred optimization
+
+**Decision recorded in START HERE; this section is the technical why.** The arm
+is **not** cancelled and **not** blocked-and-forgotten — it is a deferred
+optimization with two named re-entry routes: custom glue plus equivalence
+testing, or a gliner upgrade with re-arbitrated pins and the tokenizer gate
+re-run. **Either route re-opens work this project already paid for**, which is
+the reason it was deferred rather than taken now.
+
+Everything below is the analysis that produced the decision, kept as the
+record of what was traded away.
 
 The size-and-latency lever cannot be pulled at the current pin:
 
@@ -472,6 +528,13 @@ So ONNX needs either a **gliner upgrade** (which re-opens the entire
 finding-11 pin chain: gliner's unbounded `huggingface_hub>=0.21.4` is what
 broke it, and the fix is a coupled hub+transformers pin) or **`optimum` as a
 new dependency**. Both are Rule 7. **Not taken unilaterally.**
+
+✅ **Outcome: neither was taken.** The dependency surface is unchanged —
+`optimum` is still absent, `gliner==0.2.16` still pinned, and the coupled
+`huggingface_hub==0.36.2` + `transformers==4.57.6` pin still holds finding 11
+closed. **The cheapest property of this decision is that it moved nothing**:
+no re-resolve, no re-arbitration of the tokenizer, no new failure surface in
+an image that was about to be frozen.
 
 ### 🔬 Phase 0 of the recognizer plan — mechanism-selection spike, REQUIRED
 
