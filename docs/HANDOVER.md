@@ -27,44 +27,83 @@ Two paths through the service:
 
 ---
 
-## ⏳ 1.2.3 — SHIPPED AND CUT OVER, ⚠️ NOT YET VERIFIED. Read this first.
-
-Code pushed, image published, template repointed, cutover performed. **The one
-step still outstanding is reading the deployment back.**
+## ✅ 1.2.3 — SHIPPED, CUT OVER, VERIFIED END TO END (2026-08-16)
 
 ```
-origin/deploy/aicore-poc  42c3829   in sync, nothing unpushed
+origin/deploy/aicore-poc  39fda53   in sync, nothing unpushed
 image                     ghcr.io/terusin71/pii-scrubber:1.2.3
 digest                    sha256:9fcc4337...58d080735   linux/amd64 + attestation
 template                  -> :1.2.3   rollback comment names 1.2.2
 deployment                daedcfe9342d21a7   replaces da1b1b3e39367c59 (deleted)
 ```
 
-⚠️ **`daedcfe9342d21a7` is UNVERIFIED.** A deployment ID proves a deployment
-was created, not that it pulled the right image or that it is healthy.
-**Identity is checked, not inferred** — until `GET .../v1/info` echoes
-`build_version` exactly `1.2.3`, the running build is unknown. Do not record
-1.2.3 as live, and do not quote any deployed number, before that call returns.
+**Read back on the deployment, not inferred:**
 
-To close it:
+| Check | Deployed result |
+|---|---|
+| `/v1/info` `build_version` | **`1.2.3`** exact |
+| `unmapped_labels` before first build | `null` |
+| `unmapped_labels` after selftest | `["FAC"]` |
+| `unmapped_labels_semantics` | present in **both** responses |
+| `presidio_loaded` | `false` → `true` |
+| `/v1/selftest` | `1.2.3 / 100.0 / 45/45 / missed 0 / over_detections 4 / spans 49` |
+| `holdout_samples.json` | **108/111**, leaks `ZHANG` `Young` `Mere Tuhoe` |
+| `eval_samples_v2.json` | **65/68**, leaks `44 Bellbird Rise` `Okonkwo` `FONTAINE` |
+| `holdout_v3.json` | **45/50**, leaks `NAKAMURA` `Park` `Adeyemi` `5591230` `6620945` |
 
-```bash
-source ~/.aicore-env 2>/dev/null || echo "re-mint AI_API and TOKEN first"
-curl -s -H "Authorization: Bearer $TOKEN" -H "AI-Resource-Group: default" \
-  "$AI_API/v2/inference/deployments/daedcfe9342d21a7/v1/info" | python3 -m json.tool
-```
+Identical to the container and to the local run, field for field. Every gate
+exact, leak lists compared line-by-line. Each gate run printed `build: 1.2.3`
+itself — the stamp is per-run, not read once and assumed.
 
-Expect `build_version` `"1.2.3"`, `unmapped_labels` `null` before first scrub
-and `["FAC"]` after, and `unmapped_labels_semantics` present in both.
+**1.2.3 produced no quotable figure and could not have.** All four sets remain
+burned. The quotable number is still **90.0% blind (v3)**.
+
+### ⚠️ Trap hit during this verification — a stale env var beat the file default
+
+The three gates first returned `HTTP 404: Deployment not found` while `curl`
+against the same ID, in the same shell, seconds earlier, had worked.
+
+Cause: `DEPLOYMENT_ID` was exported in that shell as **`d08c99a19640540f`** —
+the **1.2.1** deployment, dead for two releases. `test_deployed.py` reads
+`os.environ.get("DEPLOYMENT_ID", <default>)`, so **the environment silently
+outranked the file**, and repointing the default in the repo did nothing for
+a shell that already had the variable set.
+
+Two lessons, both general:
+
+1. **Repointing a default does not repoint a session.** The ID was corrected
+   in `test_deployed.py` and committed; the shell ignored it. Any long-lived
+   terminal carries the previous release's exports. `export DEPLOYMENT_ID=`
+   explicitly before a gate run, or `unset` it and let the file win.
+2. **404 ≠ 401, and the harness's own hint says otherwise.** The abort text
+   reads `(401 = token expired; re-mint and re-run)` regardless of status, so
+   a 404 arrives wearing a 401's explanation and points the reader at the
+   token — which was valid. ⛔ **Not fixed in 1.2.3**, deliberately: the gates
+   above were produced by the harness exactly as it stands, and editing the
+   file that produced a just-verified number breaks the tie between the two.
+   Registered as the first item of the next release: make the abort print the
+   actual status and the resolved URL.
 
 | Item | State |
 |---|---|
-| 1 — `unmapped_labels()` reads the engine's real ignore list | ✅ built, `24eaef3` |
-| 2 — `unmapped_labels` surfaced on `/v1/info` | ✅ built, `3adaeaa` |
+| 1 — `unmapped_labels()` reads the engine's real ignore list | ✅ shipped, `24eaef3` |
+| 2 — `unmapped_labels` surfaced on `/v1/info` | ✅ shipped, `3adaeaa` |
 | 3 — map `FAC` → `ADDRESS` | ⛔ **WITHDRAWN. It does nothing — see below** |
-| 4 (replacement) — correct three wrong descriptions | ⏸ **authorized, gated on Teru's confirmation of the scope change** |
-| 5 — regression gates | not started; gates must be **exact-zero movement** |
-| 6-8 — build, review gate, publish | not started |
+| 4 (replacement) — correct three wrong descriptions | ✅ shipped, `7b545e8` |
+| 5 — regression gates | ✅ exact, zero movement, leak lists line-by-line |
+| 5b — self-describing payload, corrections pinned, registration re-pinned | ✅ shipped, `3940981` |
+| 6 — build + in-container verify | ✅ `1.2.3`, `linux/amd64`, gates re-run in-container |
+| 7 — review gate | ✅ passed; nothing was pushed before it |
+| 8 — publish, cut over, verify on the deployment | ✅ `42c3829` / `39fda53`, `daedcfe9342d21a7` |
+
+**5b was not in the original three.** It came out of the review of Task 4 and
+answers the three defects that review found: the payload shipped a bare
+`["FAC"]` with its caveat nowhere a reader would see it; no test could fail if
+the corrections were reverted; and §5's suite registration had gone stale two
+commits earlier without anyone noticing. Its assertions were proved by
+**mutation** — each correction reverted in turn, each producing a red suite,
+each file restored byte-identical — because a check that has never failed is
+a check that has not been shown to work.
 
 ### ⛔ Why item 3 was withdrawn — the finding this release actually produced
 
@@ -243,7 +282,7 @@ no image work — but read the build-stamp blind spot under **Settled** first.
 
 | Area | State |
 |---|---|
-| Deployment | **`daedcfe9342d21a7`** on SAP AI Core — ⚠️ **cut over, NOT yet read back.** See the 1.2.3 block at the top |
+| Deployment | ✅ **`daedcfe9342d21a7`** on SAP AI Core — running `1.2.3`, **read back and verified**, all four measurements exact. See the 1.2.3 block at the top |
 | Image | ✅ `ghcr.io/terusin71/pii-scrubber:1.2.3`, **linux/amd64**, `sha256:9fcc4337…58d080735` (1.2.2 `sha256:958bd5c3…b3ff3fa6` is the rollback) |
 | GitHub | ✅ `https://github.com/TeruSin71/pii-scrubber-poc` — **private**, branch `deploy/aicore-poc` |
 | AI Core Git sync | ✅ application `pii-scrubber-app` → repo `pii-scrubber-poc`, **path `workflows`**, revision `deploy/aicore-poc` |
