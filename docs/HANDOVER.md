@@ -1,96 +1,120 @@
 # PII Scrubber — Handover
 
-**As of 2026-08-15, end of day.** Written for someone picking this up with zero
-prior context.
+**Last updated 2026-08-16, end of session.** Written for someone picking this
+up with zero prior context. **Read the START HERE block below first** — it is
+the only section guaranteed current; everything after it is dated record.
 
 ---
 
-## 🚧 PRESIDIO PATH ACCEPTED — GLiNER IS STILL IN SCOPE. Read this first.
+## 🟢 START HERE — state as of 2026-08-16, end of session
 
-**Decision by Teru, 2026-08-16: 90% is acceptable — for the Presidio path.**
-No further tuning of Presidio recognizers is scoped. **The project is NOT
-complete: GLiNER is part of it and has never once run.**
-
-⚠️ **An earlier version of this banner said "PROJECT COMPLETE" and listed
-GLiNER as cancelled. That was wrong — the executor's scope error, corrected
-the same day.** GLiNER was never out of scope; it was blocked, which is a
-different thing, and a blocked item recorded as a dropped one is how real
-work disappears.
-
-### GLiNER — the actual state
-
-`gliner==0.2.16` and `torch==2.5.1` are **in `requirements.txt` and in the
-shipped image**. What is missing is a `huggingface_hub` pin, and without it:
+**Presidio path is ACCEPTED and SHIPPED. GLiNER now RUNS and is mid-evaluation,
+blocked on one Rule 7 decision.** Nothing is broken; nothing is half-applied.
 
 ```
-TypeError: GLiNER._from_pretrained() missing 2 required
-keyword-only arguments: 'proxies' and 'resume_download'
+deployment   daedcfe9342d21a7   running 1.2.3, read back and VERIFIED
+origin       1faf3e9            deploy/aicore-poc
+local HEAD   b5fbaf6            2 commits UNPUSHED (8003cac, b5fbaf6)
+images       pii-scrubber:gliner-cand    <- the GLiNER candidate, LOCAL ONLY
+             pii-scrubber:gliner-spike   <- superseded, safe to delete
+             ghcr.io/.../1.2.3           <- what is actually deployed
 ```
 
-`get_gliner()` calls `GLiNER.from_pretrained` at runtime, so **setting
-`SCRUBBER_ENGINE=both` on the deployment takes the pod down.** The Dockerfile
-prefetch hits the same error, so **no weights are baked in either**.
+⚠️ **Two commits are unpushed and that is deliberate** — review-before-push.
+They are the tokenizer gate and the chmod/pod-fitness work, both GLiNER-only.
+Neither touches the presidio path or the running pod.
 
-⚠️ **Finding 11 carries a ✅ that means less than it looks.** "Resolved
-2026-08-15 by `a9bed3e`" resolved the **documentation** — `README-DEPLOY.html`
-was corrected to mark `engine=both` blocked. **The defect itself is untouched
-and GLiNER still cannot load.** A ✅ beside a still-open defect is precisely
-the failure the mechanism-claims audit was authorized to find, sitting in
-plain sight.
+⚠️ **No registry push grant exists.** It was granted for 1.2.3 and **revoked**;
+grants are per-release, exact-tag, at the publish step, expiring on digest
+verification. See "Settled".
 
-### What GLiNER needs — in order
+### The decision that unblocks everything — Rule 7
 
-1. **Pin `huggingface_hub`** in `requirements.txt` to a version compatible with
-   `gliner==0.2.16`. **Rule 7 — a dependency change needs approval**, and this
-   is the approval that has been outstanding since 1.1.0.
-2. ⚠️ **Make the Dockerfile prefetch FAIL the build.** It currently ends
-   `|| echo "WARN: GLiNER prefetch skipped"`, so a failed weight download
-   produces a **green build with no weights** — the same silent gap, one layer
-   down. Pinning without fixing this can ship a "working" image that still
-   cannot load a model.
-3. **Verify in a scratch container, never against the live pod.** Free tier is
-   one pod; `daedcfe9342d21a7` stays on `presidio` until GLiNER is proven.
-4. **Then the bake-off** — GLiNER vs Presidio, the four burned sets as
-   regression, and a **new externally-authored blind batch** for any quotable
-   comparison. The burned sets cannot produce a new number for either engine.
+GLiNER's evaluation cannot finish without an **ONNX arm**, and ONNX is
+unreachable at the current pin: `GLiNER.from_pretrained` has no ONNX
+parameter in `0.2.16`, and `optimum` (the export tooling) is not installed.
+`onnxruntime 1.28.0` already is, so that part costs nothing.
 
-**Why it is worth doing, on this project's own measurements:** PERSON is the
-dominant residual leak class, rules were measured to reach about a third of
-it, and a larger spaCy model measured net-zero. GLiNER is the **only**
-remaining path that could move the number, and the thing blocking it is one
-version pin plus your approval.
+| Option | Cost | Risk |
+|---|---|---|
+| **A — approve `optimum`** | one new dependency, export tooling only | Small. gliner and the hub pin stay untouched |
+| **B — upgrade `gliner`** | re-opens the whole finding-11 chain | High. gliner's unbounded `huggingface_hub>=0.21.4` is what broke it; the tokenizer arbitration would need re-running |
+| **C — drop the ONNX arm** | choose on torch alone | Then the missing input is a **native amd64 single-vCPU latency measurement**, which this Mac cannot produce |
 
-**What was delivered**
+**Until one is chosen there is no backend choice and no frozen ship
+candidate**, and the bake-off plan cannot be written against a moving image.
+
+### What GLiNER actually is now — measured, not assumed
+
+**Finding 11 is FIXED.** The cause was **two** unbounded dependencies, not one:
+gliner declares `huggingface_hub>=0.21.4` with no upper bound, and
+`transformers 5.x` requires `hub>=1.5.0` — which drags the hub back over the
+1.0 line where `_from_pretrained` stops receiving `proxies`/`resume_download`.
+Measured: hub `0.24.7`–`0.36.2` work, `1.0.1`+ do not. **Raise either pin and
+GLiNER breaks again.**
+
+```
+huggingface_hub==0.36.2      transformers==4.57.6
+```
+
+GLiNER loads, runs, and `SCRUBBER_ENGINE=both` no longer takes the pod down.
+Detail lives in the sections below: pod-fitness gates, the tokenizer
+arbitration, and the ONNX blocker.
+
+**The headline from the gates: memory is fine, latency is the problem.**
+On the real pod shape (`--cpus=1 --memory=3g`, threads capped) GLiNER is
+**~113× slower per request** than presidio — p50 678 ms vs 6 ms, a 65-sample
+batch 47.6 s vs 0.5 s, and 4-way concurrency *degrades* to 0.48×. Peak RSS
+2.18 GiB of 3 GiB with 823 MiB headroom after a stressed run: **no OOM.**
+
+⚠️ **Do not quote 678 ms or 44 ms as the pod's latency.** 678 ms is emulated
+amd64-on-ARM (upper bound); 44 ms was native but many-core (lower bound).
+**Native amd64 on one vCPU is unmeasured and is the only figure that decides
+the live path.**
+
+### What was delivered
 
 | | |
 |---|---|
-| Service | Presidio + 9 custom SAP recognizers, running in the compliance boundary. No third-party model ever sees raw data |
-| Deployed | `pii-scrubber:1.2.3` on SAP AI Core BYOM, deployment `daedcfe9342d21a7`, verified end to end |
-| **Quotable figure** | **90.0% blind** (`holdout_v3`, 40 samples / 50 values, authored externally, run once, zero novel failure classes) |
+| Service | Presidio + 9 custom SAP recognizers, inside the compliance boundary. No third-party model sees raw data |
+| Deployed | `pii-scrubber:1.2.3`, deployment `daedcfe9342d21a7`, verified end to end |
+| **Quotable figure** | **90.0% blind** (`holdout_v3`, externally authored, run once, zero novel failure classes) |
 | Benchmark | 97.3% — **burned, regression-only, never quotable** |
-| For management | `holdout-evaluation-report.html`, `scrubber-options-for-management.html` — ready, local-only, gitignored |
+| For management | `holdout-evaluation-report.html`, `scrubber-options-for-management.html` — ready, local-only |
 
-**What was deliberately NOT done — cancelled, not forgotten.** These are cancelled because the Presidio path is accepted; **GLiNER is not among them.**
+### Queued, in order
 
-| Dropped | Why |
-|---|---|
-| Mechanism-claims audit | Authorized, never started. Inward-facing; it improves confidence in the *record*, not the scrubber. Pointless once no further releases ship |
-| Blind batch v4 | Its only purpose was a **new** number. 90% is accepted, so a new number changes no decision |
-| Recognizer plan (`FAC`) | Would close the unnumbered-street class. Real, measured, **and left open** — see below |
-| ~~GLiNER~~ | ⛔ **NOT dropped — see the banner. In scope, blocked on a `huggingface_hub` pin, awaiting Rule 7 approval.** Listing it here was the scope error |
+1. **Rule 7 decision above** — blocks the rest.
+2. **Bake-off plan for Gate 0 review.** Must pre-register: three modes
+   (presidio / gliner / union), threshold policy **never tuned on burned
+   sets**, per-engine over-redaction metrics, pod-fitness gates (compressed
+   size, memory, `--cpus=1` latency, **plus margin**), corpus rules — burned
+   sets are engineering comparison and regression **only**; a quotable number
+   requires a fresh blind batch. Plus this round's three additions: tokenizer
+   resolution recorded, `--cpus=1` latency gate, stressed memory gate.
+3. **Mechanism-claims audit** (executor) — authorized, its own scoped session.
+   Ledger every claim of mechanism here as *exercised / observed / asserted,
+   never executed*, then scratch-container probes for the third bucket. Both
+   of this project's recent errors came from that bucket.
+4. **Blind batch v4** (reviewer) — reframed: it **sizes an open leak**, it does
+   not verify a fix.
 
-⚠️ **The known residual, stated plainly so nobody inherits it by surprise:**
-roughly one in ten planted values survives, **almost all of them person
-names** — the leak is per-token, not per-frame (`VERMEULEN` is caught in the
-identical sentence `NAKAMURA` leaks from). Rules were measured to reach about
-a third of it; a larger model measured net-zero. Separately, **unnumbered
-street and facility references redact nothing at all** ("the warehouse on
-Willis Street"), which is a real open gap at the recognizer layer, not the
-`LABEL_MAP` layer.
+⚠️ **Not queued, deliberately:** more review rounds. 1.2.2 and 1.2.3 changed
+zero detection between them and the blind figure has not moved since the
+1.2.0-era measurement. Correct for what those releases were, but the loop had
+begun feeding on itself.
 
-**On the batch path this is tolerable** — a human gate sees the output.
-**On the live path there is no human gate, so ~90% is final**, and that was
-the trade accepted.
+### The known residual — inherit this knowingly
+
+Roughly one in ten planted values survives, **almost all person names**. The
+leak is **per-token, not per-frame**: `VERMEULEN` is caught in the identical
+sentence `NAKAMURA` leaks from. Rules reach about a third of it; a larger
+spaCy model measured net-zero. Separately, **unnumbered street and facility
+references redact nothing at all** ("the warehouse on Willis Street") — open
+at the **recognizer** layer, not `LABEL_MAP`.
+
+**Batch path: tolerable**, a human gate sees the output. **Live path: no human
+gate, so ~90% is final** — and that is the trade that was accepted.
 
 ### Checklist — deferred to ACTUAL project completion, i.e. after GLiNER
 
@@ -206,7 +230,13 @@ commits earlier without anyone noticing. Its assertions were proved by
 each file restored byte-identical — because a check that has never failed is
 a check that has not been shown to work.
 
-### ⛔ 1.2.3 is CLOSED. What comes next, in this order.
+### ⛔ 1.2.3 is CLOSED. (Sequence below is SUPERSEDED — see START HERE.)
+
+⚠️ **This ordering was set before GLiNER was unblocked and is kept as record,
+not instruction.** It concerns the **FAC recognizer plan**, which is a
+different piece of work from the **GLiNER bake-off plan** now in front. The
+current ordering is in the START HERE block: Rule 7 decision → bake-off plan →
+audit ∥ blind batch v4. The FAC recognizer plan sits behind all of them.
 
 Set at review, 2026-08-16. **Two pieces run in parallel; the recognizer plan
 starts only when both are in.**
@@ -738,7 +768,31 @@ Numbered as they appear in
 `docs/superpowers/plans/2026-08-15-pii-scrubber-task-list.md`, which holds the
 full text of all 18.
 
-### ⛔ Finding 11 — GLiNER cannot load; `engine=both` would crash the deployment
+### ✅ Finding 11 — CLOSED 2026-08-16. GLiNER loads; `engine=both` runs.
+
+**Read this heading, not the historical text below it.** Fixed by
+`1faf3e9`: a coupled `huggingface_hub==0.36.2` + `transformers==4.57.6` pin,
+plus a Dockerfile prefetch that can now fail the build. Verified in-container:
+`SCRUBBER_ENGINE=both` starts, loads, scrubs, and does **not** take the pod
+down. Full detail in START HERE.
+
+⚠️ **Two lessons this entry taught, both about itself:**
+
+1. **The cause was TWO unbounded dependencies, not one.** Everything below
+   says "pin `huggingface_hub`". That alone would have been undone on the next
+   resolve, because `transformers 5.x` requires `hub>=1.5.0` and drags it back
+   over the 1.0 line. A fix path recorded from a diagnosis nobody executed was
+   half a fix path.
+2. **The ✅ below is about the DOCUMENTATION, not the defect.** "Resolved
+   2026-08-15 by `a9bed3e`" corrected `README-DEPLOY.html`; GLiNER still could
+   not load for another day. A green tick beside an open defect is how this
+   entry stayed unread. If you are skimming for ⛔, you would have skipped a
+   live blocker.
+
+Everything from here down is the pre-fix record, kept because the two lessons
+above only make sense against it.
+
+#### Historical record — the defect as it stood until 2026-08-16
 
 ```
 TypeError: GLiNER._from_pretrained() missing 2 required
