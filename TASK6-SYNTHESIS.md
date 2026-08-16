@@ -107,9 +107,20 @@ This is the **SAP-jargon over-redaction class** the glossary was built to fight
 — and **the glossary structurally cannot reach it**. Suppression matches an
 **exact token** against `ALLOWLIST_EXACT`; GLiNER emits **multi-word spans**
 (`plant 4000`, `storage location 0001`, `VF04 collective run`), so the lookup
-never fires. Adding words to the glossary will not help, because the failure is
-in the matching shape, not the vocabulary. **R1 of the plan's risk register
-predicted exactly this, and it fired.**
+never fires. **R1 of the plan's risk register predicted exactly this, and it
+fired.**
+
+⚠️ **CORRECTED 2026-08-16 at Gate 0 of the overlap-suppression plan.** This
+paragraph used to end *"Adding words to the glossary will not help, because
+the failure is in the matching shape, not the vocabulary."* True as written,
+misleading as read. Measured: containment matching reaches **1 of the 8
+damaged controls fully** and one partially — control damage **8 → 7 of 21
+(38% → 33%)** against presidio's **2 (9.5%)**. The over-detections it cannot
+reach (`customer`, `plant`, `warehouse team`, `service desk`, `buyer`) are not
+in the glossary at all, so no matching rule can find them there. **The two are
+jointly necessary and separately insufficient**, and §5's "unblocking work"
+should be read as necessary-not-sufficient. Evidence:
+`GATE0-overlap-suppression-plan.md` §3.3.
 
 ### And the two paths' requirements are inverted
 

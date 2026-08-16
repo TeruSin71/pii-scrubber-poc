@@ -215,8 +215,20 @@ and the word `customer`. `HO-015` reads *"No customer or personal data in this
 one"* and comes out **"No `<PERSON>` or personal data in this one."**
 **The glossary structurally cannot reach this**: suppression matches an
 **exact token**, GLiNER emits **multi-word spans**, so the lookup never fires.
-Adding glossary entries cannot help — the failure is the matching shape, not
-the vocabulary.
+
+⚠️ **CORRECTED 2026-08-16 at Gate 0 of the overlap-suppression plan.** This
+paragraph used to end *"Adding glossary entries cannot help — the failure is
+the matching shape, not the vocabulary."* True as written, **misleading as
+read**: it invites the conclusion that fixing the matching shape unblocks the
+batch path. Measured, in the pinned container, against the recorded span
+dumps: containment matching reaches **1 of the 8 damaged controls fully**
+(`HO-029`) and one partially (`V3-040`), so control damage moves **8 → 7 of
+21 (38% → 33%)** against presidio's **2 (9.5%)**. The 65 over-detections it
+cannot reach are generic role, facility and process nouns — `customer`,
+`plant`, `warehouse team`, `service desk`, `buyer` — **none of which is in the
+glossary**, so no matching rule can find them there. **Matching shape and
+vocabulary are jointly necessary and separately insufficient.** Evidence:
+`GATE0-overlap-suppression-plan.md` §3.3.
 
 **Fixed in passing, and this one was a live defect:** `_merge` dropped any span
 overlapping a kept one, **including the characters nothing else covered** —
