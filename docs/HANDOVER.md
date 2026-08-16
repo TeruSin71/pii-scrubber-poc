@@ -5,11 +5,60 @@ prior context.
 
 ---
 
-## 🏁 PROJECT COMPLETE — 2026-08-16. Read this before anything below.
+## 🚧 PRESIDIO PATH ACCEPTED — GLiNER IS STILL IN SCOPE. Read this first.
 
-**Decision by Teru: 90% is acceptable. The POC is finished.** It answered the
-question it was built to answer. Everything below this banner is the record of
-how, and stays accurate — but no further engineering is scoped.
+**Decision by Teru, 2026-08-16: 90% is acceptable — for the Presidio path.**
+No further tuning of Presidio recognizers is scoped. **The project is NOT
+complete: GLiNER is part of it and has never once run.**
+
+⚠️ **An earlier version of this banner said "PROJECT COMPLETE" and listed
+GLiNER as cancelled. That was wrong — the executor's scope error, corrected
+the same day.** GLiNER was never out of scope; it was blocked, which is a
+different thing, and a blocked item recorded as a dropped one is how real
+work disappears.
+
+### GLiNER — the actual state
+
+`gliner==0.2.16` and `torch==2.5.1` are **in `requirements.txt` and in the
+shipped image**. What is missing is a `huggingface_hub` pin, and without it:
+
+```
+TypeError: GLiNER._from_pretrained() missing 2 required
+keyword-only arguments: 'proxies' and 'resume_download'
+```
+
+`get_gliner()` calls `GLiNER.from_pretrained` at runtime, so **setting
+`SCRUBBER_ENGINE=both` on the deployment takes the pod down.** The Dockerfile
+prefetch hits the same error, so **no weights are baked in either**.
+
+⚠️ **Finding 11 carries a ✅ that means less than it looks.** "Resolved
+2026-08-15 by `a9bed3e`" resolved the **documentation** — `README-DEPLOY.html`
+was corrected to mark `engine=both` blocked. **The defect itself is untouched
+and GLiNER still cannot load.** A ✅ beside a still-open defect is precisely
+the failure the mechanism-claims audit was authorized to find, sitting in
+plain sight.
+
+### What GLiNER needs — in order
+
+1. **Pin `huggingface_hub`** in `requirements.txt` to a version compatible with
+   `gliner==0.2.16`. **Rule 7 — a dependency change needs approval**, and this
+   is the approval that has been outstanding since 1.1.0.
+2. ⚠️ **Make the Dockerfile prefetch FAIL the build.** It currently ends
+   `|| echo "WARN: GLiNER prefetch skipped"`, so a failed weight download
+   produces a **green build with no weights** — the same silent gap, one layer
+   down. Pinning without fixing this can ship a "working" image that still
+   cannot load a model.
+3. **Verify in a scratch container, never against the live pod.** Free tier is
+   one pod; `daedcfe9342d21a7` stays on `presidio` until GLiNER is proven.
+4. **Then the bake-off** — GLiNER vs Presidio, the four burned sets as
+   regression, and a **new externally-authored blind batch** for any quotable
+   comparison. The burned sets cannot produce a new number for either engine.
+
+**Why it is worth doing, on this project's own measurements:** PERSON is the
+dominant residual leak class, rules were measured to reach about a third of
+it, and a larger spaCy model measured net-zero. GLiNER is the **only**
+remaining path that could move the number, and the thing blocking it is one
+version pin plus your approval.
 
 **What was delivered**
 
@@ -21,14 +70,14 @@ how, and stays accurate — but no further engineering is scoped.
 | Benchmark | 97.3% — **burned, regression-only, never quotable** |
 | For management | `holdout-evaluation-report.html`, `scrubber-options-for-management.html` — ready, local-only, gitignored |
 
-**What was deliberately NOT done — cancelled, not forgotten**
+**What was deliberately NOT done — cancelled, not forgotten.** These are cancelled because the Presidio path is accepted; **GLiNER is not among them.**
 
 | Dropped | Why |
 |---|---|
 | Mechanism-claims audit | Authorized, never started. Inward-facing; it improves confidence in the *record*, not the scrubber. Pointless once no further releases ship |
 | Blind batch v4 | Its only purpose was a **new** number. 90% is accepted, so a new number changes no decision |
 | Recognizer plan (`FAC`) | Would close the unnumbered-street class. Real, measured, **and left open** — see below |
-| GLiNER | Blocked on a `huggingface_hub` pin (finding 11). The one unblocked-if-approved path to better recall, and not taken |
+| ~~GLiNER~~ | ⛔ **NOT dropped — see the banner. In scope, blocked on a `huggingface_hub` pin, awaiting Rule 7 approval.** Listing it here was the scope error |
 
 ⚠️ **The known residual, stated plainly so nobody inherits it by surprise:**
 roughly one in ten planted values survives, **almost all of them person
@@ -43,10 +92,11 @@ Willis Street"), which is a real open gap at the recognizer layer, not the
 **On the live path there is no human gate, so ~90% is final**, and that was
 the trade accepted.
 
-### ✅ Completion checklist — the rotation trigger has FIRED
+### Checklist — deferred to ACTUAL project completion, i.e. after GLiNER
 
-Rotation was deferred to "project completion". **That event is now.** Owner:
-Teru. This is the recorded trigger firing, not a re-raised finding.
+⚠️ The rotation trigger is **project completion**, and the project is not complete — GLiNER is outstanding. The trigger has **not** fired. It fires when GLiNER is either shipped or formally abandoned by decision.
+
+Owner: Teru. Listed here so the checklist exists and is complete, **not** as a prompt to act now.
 
 - [ ] **Rotate the AI Core service key** (`~/aicore-key.json`) — transited chat 2026-08-15
 - [ ] **Rotate the GitHub PAT** — transited chat 2026-08-15; also used for the 1.2.3 image push
