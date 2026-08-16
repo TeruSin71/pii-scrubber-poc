@@ -64,6 +64,25 @@ spec:
               value: "{{inputs.parameters.engine}}"
             - name: GLINER_THRESHOLD
               value: "{{inputs.parameters.glinerThreshold}}"
+            # Thread cap, declared at the layer where the CPU limit is also
+            # declared. Gate 0 Q3 required BOTH layers: the image carries the
+            # same defaults, and the two must agree.
+            #
+            # Under a cgroup CPU quota torch does not necessarily see one
+            # core -- it commonly sizes its thread pool from the host's core
+            # count and then thrashes against the quota. Every pod-fitness
+            # number for GLiNER was measured with threads capped, so leaving
+            # this to chance would mean the measurements describe a machine
+            # that is not the one running.
+            #
+            # ⚠️ Keep this consistent with resources.limits.cpu below. If the
+            # CPU limit is ever raised, this is not automatically right any
+            # more -- it is a declaration about the pod's real shape, not a
+            # constant.
+            - name: OMP_NUM_THREADS
+              value: "1"
+            - name: MKL_NUM_THREADS
+              value: "1"
           resources:
             requests:
               cpu: "1"

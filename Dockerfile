@@ -111,6 +111,40 @@ ENV SCRUBBER_ENGINE=presidio \
     SPACY_MODEL=${SPACY_MODEL} \
     GLINER_THRESHOLD=0.4
 
+# RUNTIME conditions, made properties of the ARTIFACT rather than of whatever
+# command someone remembers to type. Standing rule from the bake-off Gate 0:
+# "tested artifact = deployed artifact under default invocation."
+#
+# ⚠️ PLACED HERE ON PURPOSE -- AFTER the weight prefetch, NEVER by editing the
+# early ENV block. That block sets TRANSFORMERS_OFFLINE=0 because the prefetch
+# at build time MUST reach the network to bake the weights in. Flipping it up
+# there would either break the prefetch or invalidate pip install, the spaCy
+# download and the 1.1 GB weight layer -- a full emulated rebuild, and a
+# second copy of the expensive layers on a volume that does not have room for
+# one. Last ENV wins, so build-time stays online and runtime is sealed.
+#
+# 1. OFFLINE. Rule 3 says nothing leaves the compliance boundary. Until now
+#    that held because the pod happens to have no egress, not because the
+#    image forbids it -- and presidio's UrlRecognizer already proved once that
+#    a library will reach out at runtime if nothing stops it. It matters
+#    doubly for GLiNER: the tokenizer arbitration (test_gliner_tokenizer.py)
+#    resolved that OFFLINE forces a sentencepiece->fast conversion, while
+#    ONLINE transformers downloads a prebuilt tokenizer.json instead. So an
+#    image that can reach the network may load a DIFFERENT TOKENIZER ARTIFACT
+#    than the one every measurement was taken on.
+#
+# 2. THREAD CAP. The AI Core Starter plan is 1 vCPU. Under a cgroup quota
+#    torch does not necessarily see one core -- it commonly sizes its pool
+#    from the host's core count and then thrashes against the quota. Every
+#    pod-fitness number was measured with threads capped, so the cap has to
+#    ship with the image or those numbers describe a machine nobody deploys.
+#    Declared in the ServingTemplate as well (both layers, Gate 0 Q3); the
+#    two must agree, and the template is where "1 vCPU" is actually stated.
+ENV HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1 \
+    OMP_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1
+
 # Build identity, passed at build time:
 #   docker buildx build --build-arg BUILD_VERSION=1.2.1 ...
 #
@@ -124,6 +158,23 @@ ENV SCRUBBER_ENGINE=presidio \
 # asserted structurally by test_build_version.py.
 ARG BUILD_VERSION=dev
 ENV BUILD_VERSION=${BUILD_VERSION}
+
+# Git provenance, same placement logic and the same default discipline.
+#
+# BUILD_VERSION says which RELEASE this claims to be; GIT_SHA says which
+# SOURCE produced it, and only the second can be checked against a repo.
+# Bake-off Task 0 had to establish provenance by hashing /app files against
+# git blobs -- which worked, six of six, but is evidence rather than a stamp
+# and is unavailable to anyone holding only the image.
+#
+# The default MUST stay "unknown" and MUST NOT be sha-shaped, exactly as
+# BUILD_VERSION's default must stay "dev": a plausible-looking default makes
+# an unstamped build indistinguishable from a correct one, which is the
+# incident the stamp exists to prevent.
+#
+#   docker buildx build --build-arg GIT_SHA=$(git rev-parse --short HEAD) ...
+ARG GIT_SHA=unknown
+ENV GIT_SHA=${GIT_SHA}
 
 EXPOSE 8080
 

@@ -190,6 +190,22 @@ GLOSSARY_PATH = os.getenv("GLOSSARY_PATH", str(Path(__file__).parent / "glossary
 # theorised: the empty-value service exited 1 at startup.
 BUILD_VERSION = os.getenv("BUILD_VERSION") or "dev"
 
+# Git provenance, stamped at build time alongside BUILD_VERSION.
+#
+# The two answer DIFFERENT questions and neither substitutes for the other:
+# BUILD_VERSION says which RELEASE an image claims to be, and GIT_SHA says
+# which SOURCE produced it. Only the second can be checked against a
+# repository, which is the gap Task 0 of the bake-off had to close by hashing
+# /app files against git blobs -- strong evidence, but evidence rather than a
+# stamp, and unavailable to anyone holding only the image.
+#
+# `or "unknown"` for the same reason BUILD_VERSION uses `or "dev"`: the
+# two-arg getenv form returns "" for a set-but-empty variable, and a default
+# that is not sha-shaped keeps an unstamped build distinguishable from a
+# correct one. A plausible-looking default is how a stamp stops being
+# evidence.
+GIT_SHA = os.getenv("GIT_SHA") or "unknown"
+
 
 def _load_allowlist() -> set:
     tokens = {
@@ -742,6 +758,7 @@ def info():
     # avoid is one that does not happen.
     return {
         "build_version": BUILD_VERSION,
+        "git_sha": GIT_SHA,
         "engine": ENGINE,
         "gliner_model": GLINER_MODEL if ENGINE in ("gliner", "both") else None,
         "spacy_model": SPACY_MODEL,
