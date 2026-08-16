@@ -1,0 +1,227 @@
+{
+  "_meta": {
+    "purpose": "Development verification set for OVERLAP-AWARE SUPPRESSION (ALL-TOKENS semantics). Authored 2026-08-16 at Task 0 of GATE0-overlap-suppression-plan.md, BEFORE the rule existed. ALL data is fictional.",
+    "why_it_exists": "The readability failures that motivated this change were observed on burned-set controls. Designing the rule against those exact examples and re-measuring on the same sets is circular. This file is the openly-readable, purpose-built corpus the rule is developed against -- the address_verify_samples.json pattern. The four burned sets stay REGRESSION GATES ONLY and never inform the rule.",
+    "standing": "NOT a gate. NOT quotable. NOT blind batch v4 and no substitute for it. It is committed on purpose: visibility is its purpose, exactly as visibility would destroy a holdout.",
+    "composition": "24 samples in four classes. (a) reach: multi-token SAP jargon where EVERY token is already protected -- must produce no redaction. (b) both-directions VALUE class: real PII values that CONTAIN a protected token -- must survive. (c) both-directions PERSON class: glossary words used as people -- the +/-40-char backstop must still win. (d) controls: zero-PII prose including street-type words as ordinary nouns.",
+    "semantics_under_test": "ALL-TOKENS (Gate 0 Q2): a span is suppressed only if EVERY whitespace token in it is in ALLOWLIST_EXACT or matches is_custom_sap_object, AND every token clears the user-context backstop at ITS OWN offsets (Q5).",
+    "reading_the_note_field": "`note` explains what a sample probes. It is NEVER transmitted to the service. Annotation text inside a `text` field is a named trap class in docs/HANDOVER.md (metadata-as-payload); this file keeps them structurally separate.",
+    "known_limit": "Class (a) asserts on scrub() output end to end, never on a span list. Span boundaries are the engines' to choose, so an assertion about which span was emitted would be an assertion about GLiNER's tokenizer rather than about the rule."
+  },
+  "samples": [
+    {
+      "id": "JS-A01",
+      "class": "a-reach",
+      "source_type": "ticket",
+      "text": "FSD ZMM_PRICE_SYNC was signed off before the sprint started.",
+      "pii": [],
+      "note": "Two adjacent tokens, both protected: FSD is in the built-in seed, ZMM_PRICE_SYNC matches the custom-object rule (underscore = unambiguously technical). The canonical reach case."
+    },
+    {
+      "id": "JS-A02",
+      "class": "a-reach",
+      "source_type": "ticket",
+      "text": "Escalated to Basis DEV for the interface rebuild.",
+      "pii": [],
+      "note": "Basis (module) and DEV (env) are both glossary entries and adjacent. Exact-token matching cannot see a span covering both."
+    },
+    {
+      "id": "JS-A03",
+      "class": "a-reach",
+      "source_type": "spec",
+      "text": "The RFC EDI bridge dropped every message overnight.",
+      "pii": [],
+      "note": "RFC and EDI, both glossary modules, adjacent."
+    },
+    {
+      "id": "JS-A04",
+      "class": "a-reach",
+      "source_type": "ticket",
+      "text": "GL FX postings failed again after the period close.",
+      "pii": [],
+      "note": "GL and FX shipped in 1.2.1. Two-character tokens, below the SAP_USER_ID floor, so these arrive from the spaCy layer."
+    },
+    {
+      "id": "JS-A05",
+      "class": "a-reach",
+      "source_type": "note",
+      "text": "Checked the QMEL LALE mapping and it is still correct.",
+      "pii": [],
+      "note": "QMEL (table) and LALE (doc), adjacent, no user-context cue anywhere in the window."
+    },
+    {
+      "id": "JS-A06",
+      "class": "a-reach",
+      "source_type": "spec",
+      "text": "Both /IWFND/MAINT_SERVICE and ZSD_OUTPUT_CTRL are registered in the target client.",
+      "pii": [],
+      "note": "Namespace shape and Z-shape, each unambiguously technical, so the backstop is bypassed per token by design."
+    },
+    {
+      "id": "JS-A07",
+      "class": "a-reach",
+      "source_type": "ticket",
+      "text": "Raised against FSD ZFI_DUNNING_RUN during the MDG cutover.",
+      "pii": [],
+      "note": "Three protected tokens across two spans-worth of text. MDG shipped in 1.2.1."
+    },
+    {
+      "id": "JS-A08",
+      "class": "a-reach",
+      "source_type": "note",
+      "text": "The transport moved from QAS to PRD without an incident.",
+      "pii": [],
+      "note": "SINGLE-token protected spans, no cue. Regression guard: the pre-change path must keep behaving identically -- ALL-TOKENS is a generalisation, not a replacement."
+    },
+    {
+      "id": "JS-B01",
+      "class": "b-value",
+      "source_type": "ticket",
+      "text": "Remittance advice should go to PO Box 5512, Napier 4110 from next month.",
+      "pii": [
+        {"value": "PO Box 5512, Napier 4110", "type": "ADDRESS"}
+      ],
+      "note": "R1's test. PO is a glossary entry sitting INSIDE a real postal address. Whole-span containment suppression un-redacts this; ALL-TOKENS must not, because Box/5512/Napier/4110 are not protected."
+    },
+    {
+      "id": "JS-B02",
+      "class": "b-value",
+      "source_type": "ticket",
+      "text": "Deliver the replacement pallet to 18 Kestrel Rise, Cambridge 3434.",
+      "pii": [
+        {"value": "18 Kestrel Rise, Cambridge 3434", "type": "ADDRESS"}
+      ],
+      "note": "Rise is a glossary process noun AND a street type. The collision the glossary's own rejection list warned about, on the value side."
+    },
+    {
+      "id": "JS-B03",
+      "class": "b-value",
+      "source_type": "ticket",
+      "text": "Site contact is at 7 Kowhai Way, Tauranga 3110 and the gate code changed.",
+      "pii": [
+        {"value": "7 Kowhai Way, Tauranga 3110", "type": "ADDRESS"}
+      ],
+      "note": "Way is a glossary process noun and an ambiguous street type requiring a trailing comma-locality, which this sample supplies."
+    },
+    {
+      "id": "JS-B04",
+      "class": "b-value",
+      "source_type": "ticket",
+      "text": "Invoices for the account now go to PO Box 220, Whangarei 0140, attention Hemi Waititi.",
+      "pii": [
+        {"value": "PO Box 220, Whangarei 0140", "type": "ADDRESS"},
+        {"value": "Hemi Waititi", "type": "PERSON"}
+      ],
+      "note": "A protected token inside one value while a second, unrelated value sits in the same sentence. Suppressing the address must not disturb the person."
+    },
+    {
+      "id": "JS-B05",
+      "class": "b-value",
+      "source_type": "note",
+      "text": "The DC Terrace office at 42 Rimu Terrace, Napier 4112 takes the returns.",
+      "pii": [
+        {"value": "42 Rimu Terrace, Napier 4112", "type": "ADDRESS"}
+      ],
+      "note": "DC is a glossary facility token adjacent to the value rather than inside it. Guards against a rule that widens a suppression to a neighbouring span."
+    },
+    {
+      "id": "JS-B06",
+      "class": "b-value",
+      "source_type": "ticket",
+      "text": "Bank details for the payer changed; new IBAN is NZ42 0099 1122 3344 5566 77.",
+      "pii": [
+        {"value": "NZ42 0099 1122 3344 5566 77", "type": "IBAN"}
+      ],
+      "note": "A structured value whose whitespace tokens are individually meaningless. Confirms tokenisation of a multi-token span does not accidentally make every token unprotected-but-suppressible."
+    },
+    {
+      "id": "JS-C01",
+      "class": "c-person",
+      "source_type": "ticket",
+      "text": "Delivery note query reported by Driver, please assign back to the team.",
+      "pii": [
+        {"value": "Driver", "type": "PERSON"}
+      ],
+      "note": "Driver is a glossary role AND a plausible surname. 'reported by' is a user-context cue inside +/-40 chars, so the backstop must refuse suppression. A glossary entry vetoes a PATTERN, never CONTEXT."
+    },
+    {
+      "id": "JS-C02",
+      "class": "c-person",
+      "source_type": "ticket",
+      "text": "The exception was approved by Payer and logged the same afternoon.",
+      "pii": [
+        {"value": "Payer", "type": "PERSON"}
+      ],
+      "note": "Same class, different cue ('approved by' is not in the frozen cue list -- 'approver' is). Deliberately probes the cue boundary rather than assuming the list covers it."
+    },
+    {
+      "id": "JS-C03",
+      "class": "c-person",
+      "source_type": "note",
+      "text": "Change requested by Rise and countersigned by Way on the same ticket.",
+      "pii": [
+        {"value": "Rise", "type": "PERSON"},
+        {"value": "Way", "type": "PERSON"}
+      ],
+      "note": "Two glossary words as two people in one sentence, both behind 'requested by'. If ALL-TOKENS ever merged them into one span the whole span would be protected -- this is the sample that would catch it."
+    },
+    {
+      "id": "JS-C04",
+      "class": "c-person",
+      "source_type": "ticket",
+      "text": "Escalated on behalf of Basis, who raised it during the night shift.",
+      "pii": [
+        {"value": "Basis", "type": "PERSON"}
+      ],
+      "note": "'on behalf of' is in the frozen cue list. Basis is a module name being used as a person, which is the shape that makes suppression dangerous."
+    },
+    {
+      "id": "JS-D01",
+      "class": "d-control",
+      "source_type": "ticket",
+      "text": "Movement type 561 posts against the storage bin in the DC overnight.",
+      "pii": [],
+      "note": "DC as an ordinary facility abbreviation, no cue. Must be suppressed exactly as today."
+    },
+    {
+      "id": "JS-D02",
+      "class": "d-control",
+      "source_type": "note",
+      "text": "Rise in open items after the MRP run still needs review before month end.",
+      "pii": [],
+      "note": "Rise as an ordinary noun in sentence-initial position -- the position the per-token PERSON lottery is worst at."
+    },
+    {
+      "id": "JS-D03",
+      "class": "d-control",
+      "source_type": "spec",
+      "text": "Court, Terrace, Close and Drive are all valid street types in the configuration table.",
+      "pii": [],
+      "note": "The four PRE-CLEARED-BUT-UNSHIPPED street types as ordinary nouns. None is in the glossary, so nothing here may be suppressed -- this sample must NOT become the evidence that ships them."
+    },
+    {
+      "id": "JS-D04",
+      "class": "d-control",
+      "source_type": "ticket",
+      "text": "Output determination did not trigger for the collective run this morning.",
+      "pii": [],
+      "note": "Zero protected tokens anywhere. If a redacting span appears here, the change reached something it should not have."
+    },
+    {
+      "id": "JS-D05",
+      "class": "d-control",
+      "source_type": "note",
+      "text": "The interface between the two plants is stable and no data was affected.",
+      "pii": [],
+      "note": "Interface is a glossary module used as an ordinary noun; plants is not protected at all. Mixed span, must stay unsuppressed under ALL-TOKENS."
+    },
+    {
+      "id": "JS-D06",
+      "class": "d-control",
+      "source_type": "ticket",
+      "text": "Reversal posted, PGI repeated, and the OSS note was applied without error.",
+      "pii": [],
+      "note": "Three separate single-token glossary entries in one sentence, none adjacent. Confirms the change does not depend on adjacency."
+    }
+  ]
+}
