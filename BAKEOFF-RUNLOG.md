@@ -359,3 +359,30 @@ catches, and no latency saving. **If GLiNER ships at all, it ships as `both`.**
 | S4 | threshold other than the frozen one | ✅ `0.4` image default, unchanged across arms |
 | S5 | RSS > 3 GB or non-zero exit | ✅ max 2.175 GiB, all arms exit clean |
 | S6 | corpora line differs between arms | ✅ `samples: 158`, same four files, all arms |
+
+---
+
+## Tasks 6–7 — synthesis and review gate — ✅ CLOSED 2026-08-16
+
+**Verdict: NO-SHIP AS-IS.** Batch dissent accepted; `gliner`-alone retired;
+the inverted-liabilities finding is the headline result.
+
+Determinism was verified **before** exact gates were pinned — the union arm
+reproduces span-for-span including scores and engine attribution, and by
+whole-corpus output hash. An exact gate on a non-deterministic arm would
+manufacture stops.
+
+**Sequenced path forward:** (1) overlap-aware suppression — detection change,
+own plan, own Gate 0, readability re-measured against the fixed candidate;
+(2) if it rescues batch, ONE union release covering both paths, pod latency
+measured at its verification with the presidio fallback pre-stated.
+
+⛔ **Live-first split shipping considered and DECLINED** — it needs a
+per-request engine mode that does not exist (`ENGINE` is read once at import,
+process-wide), so it buys new surface plus a second cutover on a 1-pod tier for
+half the win, and the half whose gate is the one still unmeasured.
+
+**v4: HELD.** Runs once, against the deployed union release, at its
+verification. Not before.
+
+**Deployment untouched throughout: `daedcfe9342d21a7`, `1.2.3`, presidio.**

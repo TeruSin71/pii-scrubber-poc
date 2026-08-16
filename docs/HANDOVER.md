@@ -132,26 +132,75 @@ the live path.**
    2026-08-16.** `docs/superpowers/plans/2026-08-16-pii-scrubber-gliner-bakeoff.md`,
    revision 1. Gate 0 rulings and Q1–Q8 are verbatim in its §12; the standing
    rules they produced are in "Settled" above.
-3. **← YOU ARE HERE. Execute the bake-off**, in the authorized order:
-   Task 0 (pre-fix baseline + per-file provenance hash) → **Task 1, MANDATORY**
-   (`_merge` monotonicity fix + git sha + both offline vars + thread cap at
-   both layers, **ONE** build, re-freeze, tokenizer re-proof) → Tasks 2–6 →
-   **Task 7 review gate**.
-   ⚠️ **The freeze is lifted for exactly one rebuild.** The candidate that gets
-   measured is Task 1's output, not today's `pii-scrubber:gliner-cand`.
-   ⚠️ **No deployment touch, nothing pushed beyond the three authorized
-   commits, blind batch v4 untouched.**
-4. **Mechanism-claims audit** (executor) — authorized, its own scoped session.
-   Ledger every claim of mechanism here as *exercised / observed / asserted,
-   never executed*, then scratch-container probes for the third bucket. Both
-   of this project's recent errors came from that bucket.
-5. **Blind batch v4** (reviewer) — reframed: it **sizes an open leak**, it does
-   not verify a fix. ⛔ **And it is never a tuning corpus** — see "Settled".
+3. ✅ ~~Execute the bake-off~~ — **COMPLETE 2026-08-16. Verdict: NO-SHIP
+   AS-IS.** Tasks 0–7 all run and closed at the review gate. Full record:
+   `TASK6-SYNTHESIS.md`, `BAKEOFF-RUNLOG.md`, and §13 of the plan. Summary
+   below under "The GLiNER bake-off result".
+4. **← YOU ARE HERE. Overlap-aware suppression** — a **detection change**, so
+   its own plan, its own Gate 0, its own pre-registration, and the readability
+   measurement re-run against the fixed candidate. It is the single named
+   blocker between here and a union release.
+5. **Then, only if it rescues batch:** one union release, **both paths in a
+   single cutover**. Pod latency measured at its verification, presidio
+   fallback pre-stated. ⛔ **Live-first split shipping was considered and
+   DECLINED** — it needs a per-request engine mode that does not exist
+   (`ENGINE` is process-wide), so it buys new surface plus a second cutover for
+   half the win, and the half whose gate is the one still unmeasured.
+6. **Mechanism-claims audit** (executor) — still queued, authorized, its own
+   scoped session. Ledger every claim of mechanism here as *exercised /
+   observed / asserted, never executed*, then scratch-container probes for the
+   third bucket. Both of this project's recent errors came from that bucket.
+7. **Blind batch v4** (reviewer) — ⛔ **HELD.** It **sizes an open leak**; it
+   does not verify a fix. Runs **once**, against the **deployed union
+   release**, at its verification. **Not before**, and ⛔ **never a tuning
+   corpus** — see "Settled".
 
 ⚠️ **Not queued, deliberately:** more review rounds. 1.2.2 and 1.2.3 changed
 zero detection between them and the blind figure has not moved since the
 1.2.0-era measurement. Correct for what those releases were, but the loop had
 begun feeding on itself.
+
+### 🏁 The GLiNER bake-off result — CLOSED 2026-08-16, NO-SHIP AS-IS
+
+Measured on one frozen artifact,
+`pii-scrubber:gliner-cand@sha256:d96edef4…c764912` / `git_sha 67fc888`, three
+arms, threshold frozen at `0.4`. **Nothing shipped; the deployment never moved.**
+
+**The headline is not "union wins" — it is that GLiNER's two liabilities each
+disqualify it from a different path.**
+
+| Path | Tolerates | Does NOT tolerate | GLiNER's liability there |
+|---|---|---|---|
+| **batch** | latency (async) | over-redaction (text must stay readable) | **38% of clean controls damaged** |
+| **live** | over-redaction (`token_map` re-maps inside the boundary) | latency (no human in the loop) | **702 ms emulated upper bound** |
+
+**What is real and durable: the failure classes are near-disjoint.** GLiNER
+leaks IBANs, IPs, phone extensions and `svc_*` accounts and leaks **zero
+PERSON**; presidio leaks eight PERSON values and catches all the structured
+ones. Union closed all three burned corpora to 100% — ⛔ **which is the
+predicted shape of a burned set, not a result, and is not quotable.**
+
+**Why batch is blocked, and why it is not a matter of taste:** union damages
+8 of 21 zero-PII control samples against presidio's 2, and what it redacts is
+SAP vocabulary — `plant 4000`, `storage location 0001`, `VF04 collective run`,
+and the word `customer`. `HO-015` reads *"No customer or personal data in this
+one"* and comes out **"No `<PERSON>` or personal data in this one."**
+**The glossary structurally cannot reach this**: suppression matches an
+**exact token**, GLiNER emits **multi-word spans**, so the lookup never fires.
+Adding glossary entries cannot help — the failure is the matching shape, not
+the vocabulary.
+
+**Fixed in passing, and this one was a live defect:** `_merge` dropped any span
+overlapping a kept one, **including the characters nothing else covered** —
+548 of 3000 random geometries lost coverage, **live in presidio-only mode**.
+Now invariant-bound: coverage is the union of every input span's characters, so
+adding an engine can never un-redact. One presidio-path delta resulted, on
+`HO-012`, and it was a period.
+
+⚠️ **`engine` on a span records which span WON `_merge`, not which engine
+detected the value.** presidio's on-value count falls 266 → 88 between its own
+arm and the union for that reason alone. Any monitor reading it as "who found
+it" will be wrong, in the direction that makes presidio look redundant.
 
 ### The known residual — inherit this knowingly
 

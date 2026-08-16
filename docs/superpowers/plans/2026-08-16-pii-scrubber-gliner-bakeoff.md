@@ -821,6 +821,57 @@ Recorded **verbatim, dated, attributed**, per the "Settled" rule in
 
 ---
 
+## 13. ⛔ TASK 7 CLOSED — BAKE-OFF COMPLETE. Verdict: NO-SHIP AS-IS.
+
+**Reviewer session (Claude Cowork), relayed by Teru, 2026-08-16. Verbatim, in
+full.** This plan is closed; the work it hands on is listed below it.
+
+> Task 7: CLOSED. Bake-off COMPLETE.
+>
+> Verdict: NO-SHIP AS-IS — batch dissent ACCEPTED (38% control damage,
+> structural cause, glossary cannot reach it; R1 fired as registered).
+> gliner-alone retired. Inverted-liabilities finding is the headline
+> result of the synthesis.
+>
+> Path forward, sequenced: (1) overlap-aware suppression — detection
+> change, own plan, own Gate 0, own pre-registration; readability
+> measurement re-runs against the fixed candidate. (2) If it rescues
+> batch: single union release, both paths, pod latency measured at its
+> verification, presidio fallback pre-stated. Live-first split shipping
+> considered and DECLINED (per-request mode = new surface, second
+> cutover, half the win).
+>
+> Push: the seven commits AUTHORIZED (review-before-push satisfied at
+> this gate), plus the Task 6/7 synthesis + §12 + HANDOVER result
+> records as docs-only commits under the same authorization.
+>
+> v4: HELD. Runs once, against the deployed union release, at its
+> verification. Not before.
+>
+> Still queued: mechanism-claims audit. Deployment untouched throughout —
+> daedcfe9342d21a7 on 1.2.3, presidio, unaffected by everything above.
+
+**Live-first split shipping was considered and declined**, and the reasoning is
+worth keeping because it is the obvious-looking option: shipping union on live
+only would need a **per-request engine mode**, which today does not exist —
+`ENGINE` is read once at import and used process-wide (§3.3). That is new
+surface, a second cutover on a 1-pod tier, and it buys the half of the win
+whose gate (**pod latency**) is the one still unmeasured. Declined.
+
+**What this plan produced, for the record:**
+
+| | |
+|---|---|
+| Shipped to the deployment | **nothing** — `daedcfe9342d21a7` still runs `1.2.3`, presidio |
+| Fixed in code | `_merge` coverage monotonicity — a **live leak class in presidio-only mode**, 548/3000 geometries |
+| Hardened in the artifact | git sha, offline sealed, thread caps at both layers |
+| Retired | `gliner` as a mode |
+| Blocked | `both` on batch — over-redaction, structural cause named |
+| Deferred | `both` on live — pod latency gate, fallback pre-stated |
+| Handed on | overlap-aware suppression (own plan), then a possible single union release |
+
+---
+
 ## Appendix A — Measurement-conditions ledger
 
 Filled in at Task 0 and updated per run. Its purpose is that no figure in the
