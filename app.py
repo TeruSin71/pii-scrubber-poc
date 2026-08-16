@@ -291,6 +291,24 @@ _load_error: Optional[str] = None
 # exists to announce.
 _unmapped: Optional[List[str]] = None
 
+# Shipped IN the /v1/info payload, not only in a docstring nobody curls.
+# 1.2.3 corrected three descriptions of this field and left the field itself
+# bare: a one-element list `["FAC"]` that reads exactly like a leak list to
+# anyone hitting the endpoint. It is not one -- it is a SUPERSET, and the
+# caveat has to travel with the value or it does not travel at all.
+# A field whose meaning lives somewhere the reader is not is an unlabelled
+# number, and this project has already paid for one of those.
+UNMAPPED_LABELS_SEMANTICS = (
+    "SUPERSET of entity labels that LABEL_MAP does not translate -- NOT a "
+    "leak list. Models presidio's labels_to_ignore and its entity mapping, "
+    "but NOT the recognizer's supported_entities, so a label listed here may "
+    "be dropped AFTER detection or may never reach the pipeline at all "
+    "(FAC is the latter on this build: SpacyRecognizer does not support it, "
+    "so the span is discarded before LABEL_MAP is consulted). "
+    "null = analyzer not built yet, nothing checked; [] = checked, nothing "
+    "unmapped. Evidence: fac_probe_validation.md."
+)
+
 
 # --------------------------------------------------------------------------
 # Lazy model loading -- keeps /health instant so readiness probes never time
@@ -637,6 +655,8 @@ def info():
         # null until the analyzer is built (lazy). null = "not known yet",
         # [] = "checked, nothing unmapped". Do not collapse them.
         "unmapped_labels": _unmapped,
+        # The value's meaning travels WITH the value. See the constant.
+        "unmapped_labels_semantics": UNMAPPED_LABELS_SEMANTICS,
         "presidio_loaded": _analyzer is not None,
         "gliner_loaded": _gliner is not None,
         "last_load_error": _load_error,

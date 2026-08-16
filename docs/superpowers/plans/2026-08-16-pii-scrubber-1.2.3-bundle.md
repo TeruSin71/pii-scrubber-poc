@@ -241,8 +241,35 @@ optimism.
 | `holdout_samples.json` | **`108/111`**, leaks `ZHANG` `Young` `Mere Tuhoe` | ⛔ stop, rise or fall |
 | `eval_samples_v2.json` | **`65/68`**, leaks `44 Bellbird Rise` `Okonkwo` `FONTAINE` | ⛔ stop, rise or fall |
 | `holdout_v3.json` | **`45/50`**, five known leaks | ⛔ stop, rise or fall |
-| Suites | 16 · 39 · 33 · 74 · 17 · **13 changes by design** | ⛔ stop |
+| Suites | **16 · 39 · 33 · 74 · 29 · 37** — re-pinned at Task 5b, see below | ⛔ stop |
 | `test_label_map.py` | ~~`FAC` flips from *reported* to *not reported*; `unmapped_labels()` → `[]`~~ | ~~**This is the one registered flip in the release**~~ ⛔ **CANCELLED — see below** |
+
+### 🔁 SUITE COUNTS RE-PINNED — 2026-08-16, Task 5b
+
+**This row was stale, and the exact-gate rule did not catch it.**
+
+| Pinned | Value | Why it moved |
+|---|---|---|
+| Gate 0 (original) | `16 · 39 · 33 · 74 · 17 · 13` | the 1.2.2 baseline |
+| after items 1-2 (`24eaef3`, `3adaeaa`) | `16 · 39 · 33 · 74 · 22 · 23` | +5 `/v1/info` and wiring tests, +10 diagnostic tests — **by design, and never re-pinned here** |
+| **after Task 5b (current)** | **`16 · 39 · 33 · 74 · 29 · 37`** | +7 payload-semantics assertions, +14 correction-pinning assertions |
+
+The Gate-0 row stayed at `17 · 13` while items 1 and 2 had already moved it to
+`22 · 23`. It was in breach from `24eaef3` onward and went unnoticed through
+two commits and a handover. It surfaced only at Task 5 because the gate
+compared against **this written registration** rather than against the
+previous run — which is the entire argument for writing registrations down.
+
+**Standing rule adopted (HANDOVER, "Settled"):** a registered number is
+re-pinned in the **same commit** that moves it, so *registered* always means
+*registered as of HEAD*. A stale registration is worse than none — it silently
+downgrades an exact gate to "compare against whatever printed last time".
+
+⚠️ **The four evaluation gates below were never stale and have not moved:**
+`108/111 · 65/68 · 45/50 · selftest 100.0 / 45/45 / 0 / 4 / spans 49`. Suite
+counts move when tests are added deliberately; **gate values do not move at
+all.** The two are different kinds of number and the rule change does not
+soften the second.
 
 ### ⛔ CANCELLATION of the one registered flip — 2026-08-16, reviewer-confirmed
 

@@ -188,6 +188,46 @@ check("fresh process: /info did NOT force an eager model load",
       "presidio_loaded is True -- /info triggered a load and /health is no "
       "longer instant")
 
+# ---------------------------------------------------------------------------
+# 1.2.3 Task 5b. The payload is SELF-DESCRIBING.
+#
+# unmapped_labels ships as ["FAC"] -- a one-element list that reads exactly
+# like a leak list to anyone curling the endpoint. It is a SUPERSET: the
+# diagnostic does not model the recognizer's supported_entities, and FAC is
+# dropped before LABEL_MAP is ever consulted, so it cannot leak through this
+# path at all.
+#
+# 1.2.3 Task 4 put that caveat in the docstring, the call-site comment, the
+# log line and the handover -- everywhere except the place an operator
+# actually reads. The value now carries its own meaning.
+# ---------------------------------------------------------------------------
+print("The unmapped_labels value carries its own semantics")
+
+check("/info carries an unmapped_labels_semantics KEY",
+      "unmapped_labels_semantics" in fresh,
+      f"info() keys: {sorted(fresh)}")
+
+_sem = fresh.get("unmapped_labels_semantics") or ""
+check("semantics is a non-empty string", isinstance(_sem, str) and len(_sem) > 80,
+      f"got {_sem!r}")
+check("semantics says SUPERSET, and says NOT a leak list",
+      "SUPERSET" in _sem and "NOT a leak list" in _sem,
+      f"got {_sem[:120]!r}")
+check("semantics names supported_entities as the unmodelled filter",
+      "supported_entities" in _sem)
+check("semantics distinguishes null from [] in the payload itself",
+      "null =" in _sem and "[] =" in _sem,
+      "an operator cannot tell 'not checked' from 'nothing unmapped'")
+check("semantics is the module constant, not a copied literal",
+      _sem == A.UNMAPPED_LABELS_SEMANTICS,
+      "a copied payload string is a payload string that drifts")
+
+# The pairing is the point: a bare value plus a caveat that lives elsewhere
+# is the defect. Assert they ship together, on the SAME response.
+check("value and its semantics ship in the SAME payload",
+      "unmapped_labels" in fresh and "unmapped_labels_semantics" in fresh,
+      "the caveat must travel with the value or it does not travel")
+
 print("Harness identity routes -- gateway-reachable, printed")
 
 harness = open("test_deployed.py").read()

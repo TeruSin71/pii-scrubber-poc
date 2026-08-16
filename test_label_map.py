@@ -209,6 +209,90 @@ check("startup logs a WARNING naming the unmapped label",
       "FAC" in logged and "LABEL_MAP" in logged,
       f"last log lines: {logged.strip().splitlines()[-3:]}")
 
+# ---------------------------------------------------------------------------
+# 1.2.3 Task 5b -- the three corrections are PINNED.
+#
+# Task 4 corrected three descriptions and nothing asserted any of them. The
+# suite checked only that "FAC" and "LABEL_MAP" appeared in the log, which
+# survives ANY rewording -- including a full revert to the text that was
+# measured wrong. A corrections-only release whose corrections no test can
+# fail on is the "verification that cannot fail where it matters" trap,
+# committed by the release that exists to eliminate it.
+#
+# Each correction is asserted in BOTH directions: the corrected claim is
+# present AND the superseded claim is absent. Presence alone would pass if
+# someone appended the new text and left the old text sitting above it.
+#
+# Whitespace-normalised, because markdown and docstrings get rewrapped and a
+# correction that survives rewrapping is the one worth pinning.
+# ---------------------------------------------------------------------------
+print("1.2.3 Task 5b -- the three corrected descriptions are pinned")
+
+
+def _flat(s):
+    return " ".join(s.split())
+
+
+_WRONG = "DETECTED and then silently dropped"
+
+# Correction 1 -- the shipped log line.
+check("log line states the supported_entities limitation",
+      _flat("does not model recognizer supported_entities") in _flat(logged),
+      f"log line: {[l for l in logged.splitlines() if 'LABEL_MAP has no' in l]}")
+check("log line states a label may never reach the pipeline",
+      _flat("may never reach the pipeline at all") in _flat(logged))
+check("log line no longer claims the spans were DETECTED",
+      _flat(_WRONG) not in _flat(logged),
+      "the superseded 1.2.2 wording is back in the shipped log line")
+
+# Correction 3 -- unmapped_labels' documented semantics.
+_doc = A.unmapped_labels.__doc__ or ""
+check("docstring calls the result a SUPERSET of the leak list",
+      _flat("SUPERSET OF THE LEAK LIST, NOT THE LEAK LIST") in _flat(_doc),
+      "docstring no longer states the superset semantics")
+check("docstring names supported_entities as the unmodelled filter",
+      _flat("does NOT model the third and narrowest, the registered "
+            "recognizer's `supported_entities`") in _flat(_doc))
+check("docstring states FAC never reaches _norm",
+      _flat("FAC never reaches _norm") in _flat(_doc))
+
+# The payload semantics ship with the value, not only in the docstring.
+_sem = getattr(A, "UNMAPPED_LABELS_SEMANTICS", "")
+check("UNMAPPED_LABELS_SEMANTICS exists and says SUPERSET, not leak list",
+      "SUPERSET" in _sem and "NOT a leak list" in _sem,
+      f"got {_sem[:80]!r}")
+check("UNMAPPED_LABELS_SEMANTICS names supported_entities",
+      "supported_entities" in _sem)
+check("UNMAPPED_LABELS_SEMANTICS distinguishes null from []",
+      "null =" in _sem and "[] =" in _sem)
+
+# Correction 2 -- the handover's trap-8 mechanism. Local-only: docs/ is in
+# .dockerignore and the image COPYs an explicit file list, so this file is
+# never present in a container. Skip loudly rather than pass quietly.
+_hpath = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                      "docs", "HANDOVER.md")
+if not os.path.exists(_hpath):
+    print(f"  [SKIP] handover trap-8 assertions -- {_hpath} not present "
+          f"(expected in-container; a FAILURE if you see this locally)")
+else:
+    _h = _flat(open(_hpath, encoding="utf-8").read())
+    check("handover trap-8 carries Correction 2",
+          "Correction 2, measured 2026-08-16 at Task 3 of 1.2.3" in _h,
+          "the _norm() correction is missing from docs/HANDOVER.md")
+    check("handover states FAC does not reach _norm()",
+          "It does not reach `_norm()`." in _h)
+    check("handover names the recognizer as the layer that drops it",
+          "before `LABEL_MAP` is consulted at all" in _h)
+    check("handover states the diagnostic over-reports by construction",
+          "over-reports, by construction" in _h)
+    # Both-directions, without depending on punctuation: the superseded
+    # mechanism may survive ONLY as a labelled record of what was wrong. If
+    # the old phrasing is present anywhere, its refutation must be too.
+    _old_here = "arrives at `_norm()` raw" in _h
+    check("superseded '_norm() raw' mechanism never stands unrefuted",
+          (not _old_here) or "It does not reach `_norm()`." in _h,
+          "the pre-1.2.3 mechanism appears with no correction beside it")
+
 print()
 if FAILURES:
     print(f"FAILED: {len(FAILURES)} -> {FAILURES}")

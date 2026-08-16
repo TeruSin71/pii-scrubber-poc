@@ -104,12 +104,52 @@ lines in the pinned container:
 'Auckland International Airport'   detect() = []
 ```
 
-**The correct layer is the recognizer, not `LABEL_MAP`.** Precedent exists:
-`get_analyzer()` already re-registers `SpacyRecognizer` with `ORGANIZATION`
-added, for the 1.2.0 ORG defect. Adding `FAC` is the analogous fix and is
+**The correct layer is the recognizer, not `LABEL_MAP`.** Adding `FAC` is
 **materially larger than one line** — it needs its own plan, its own
 pre-registration, correct-layer incidence evidence, and the probe batch
 re-run against a FAC-registered build.
+
+### 📌 Registered for the recognizer plan — 2026-08-16, verified at the pin
+
+Three facts the plan must start from. All measured on presidio 2.2.357 +
+`en_core_web_sm`, through `app.get_analyzer()` (never a bare `AnalyzerEngine`).
+
+**1. Provenance of the nine-element `supported_entities` list — one line:**
+the registered `SpacyRecognizer.supported_entities` is exactly the set of
+**distinct values of presidio's `NerModelConfiguration.model_to_presidio_entity_mapping`**
+(`AGE DATE_TIME EMAIL ID LOCATION NRP ORGANIZATION PERSON PHONE_NUMBER`) —
+**not** the class attribute `SpacyRecognizer.ENTITIES`, which is only five
+(`DATE_TIME NRP LOCATION PERSON ORGANIZATION`). The registry builds the
+recognizer from what the NLP mapping can produce. `FAC` is in neither, and
+that is *why*: `FAC` is not a value in the mapping, so it can never be a
+supported entity by that route.
+
+**2. ⚠️ TWO-CONDITION GUARD — verify BOTH, separately.** A span survives only
+if the entity is *supported* **and** *requested*. Registering `FAC` satisfies
+condition (a) alone, and a plan that verifies only (a) will produce another
+correct-and-unreachable change:
+
+| | Condition | How it fails silently |
+|---|---|---|
+| (a) | The entity is in the registered recognizer's `supported_entities` | No `RecognizerResult` is ever produced — today's `FAC` case |
+| (b) | The entity is in the entities **requested** at `analyze()` time | Supported but filtered out at the call; the recognizer runs and its result is discarded |
+
+Measured today, both fail: `analyze()` unfiltered returns `[]`, and
+`analyze(entities=["ADDRESS","LOCATION"])` also returns `[]`.
+**Assert on `scrub()` output end to end, never on either list.**
+
+**3. ⚠️ The cited precedent is DORMANT — do not lean on it.** This document
+and `fac_probe_validation.md` both said "`get_analyzer()` already
+re-registers `SpacyRecognizer` with `ORGANIZATION` added, so adding `FAC` is
+the analogous fix". **At this pin that branch never executes.** `ORGANIZATION`
+is already in the class `ENTITIES` and in the mapping values, so the guard
+`if "ORGANIZATION" not in ents` is false and the log reads
+`SpacyRecognizer already supports ORGANIZATION` — confirmed in the run log.
+The 1.2.0 ORG fix works **entirely** through the NLP-layer `labels_to_ignore`
+change; the re-registration is dead code kept for presidio versions where the
+entity is missing. **So the FAC change would be the first time that path ever
+fires, not a repeat of a proven one.** Same error shape as the release that
+produced this note: a mechanism assumed to work because code for it exists.
 
 ⚠️ **`fac_probe_validation.md`'s "0 of 12 control fires" is NOT safety
 evidence for that change.** `FAC` could not fire on any line, so the controls
@@ -286,6 +326,19 @@ was caught but typed `ORG_NAME` — redacted, mistyped, log only.
   protects. Governance decision, not an engineering shortcut.
 - **`holdout_samples.json` is gitignored on purpose.** A holdout anyone can read
   while tuning is not a holdout. Same for the two HTML reports.
+- **A registered number is re-pinned in the SAME COMMIT that moves it.** Any
+  task that deliberately changes a pre-registered value updates the
+  registration alongside the change, so **"registered" always means
+  "registered as of HEAD"**. Established at 1.2.3 Task 5b, after §5 of the
+  1.2.3 plan sat at the 1.2.2 suite baseline (`17 · 13`) while items 1 and 2
+  had already moved it to `22 · 23`. That row was in breach from `24eaef3`
+  onward and went unnoticed through two commits and a handover — it surfaced
+  only because the gate compared against the *written registration* rather
+  than the previous run. **A stale registration is worse than none:** it
+  silently downgrades an exact gate to "compare against whatever printed last
+  time", which is the precise failure exact gates exist to prevent. Applies to
+  every place a number is written down — the release plan's §5 **and** the
+  evaluation block near the end of this document.
 - **Advisory code must be unable to break the pipeline it advises on.** A
   diagnostic that can take down the thing it diagnoses has **negative value**:
   it converts a reporting gap into an outage. Any block that only reports —
@@ -815,8 +868,8 @@ python test_fixes.py            # 16  three fixed defect classes + recall invari
 python test_address.py          # 39  street-address recognizer, both directions
 python test_customer_number.py  # 33  cue-gated lookbehind patterns
 python test_jargon.py           # 74  glossary: suppression under the context backstop
-python test_build_version.py    # 22  build identity, /v1/info, gateway-reachable routes
-python test_label_map.py        # 23  unmapped-label diagnostic + its failure isolation
+python test_build_version.py    # 29  build identity, /v1/info + payload semantics, routes
+python test_label_map.py        # 37  unmapped-label diagnostic, failure isolation, corrections pinned
 
 # The four burned gates, all exact. Any movement either way is a stop.
 #   holdout_samples.json  108/111   eval_samples_v2.json  65/68
