@@ -1,14 +1,27 @@
 # PII Scrubber — GLiNER Bake-off Plan
 
-**Gate 0 deliverable. Nothing in this plan has been executed.**
-Authored 2026-08-16 against `429a19b`, after the Rule 7 gate.
-Backend is **torch**; the ONNX arm is struck and deferred. Ship candidate is
-**frozen** at `pii-scrubber:gliner-cand`.
+**REVISION 1 — 2026-08-16. ✅ GATE 0 IS ANSWERED; findings 1–5 accepted and
+ruled on.** Verbatim answers in §12. Nothing in this plan has been executed.
+Authored against `429a19b`, revised against `751c082`.
 
-**Binding process, restated:** the plan is reviewed **before** anything runs.
-Per the reviewer at the Rule 7 gate — *"Nothing else runs — no build, no
-deployment touch — until that plan is reviewed."* Task 0 is the first thing
-that executes, and only after Gate 0 answers §4's questions.
+Backend is **torch**; the ONNX arm is struck and deferred.
+
+⚠️ **The freeze is LIFTED for exactly ONE rebuild** (Task 1), then re-applied.
+`pii-scrubber:gliner-cand` as it stands today is **not** the artifact that gets
+measured — the measured artifact is Task 1's output, which carries a git sha,
+the offline vars, the thread cap, and the `_merge` monotonicity fix.
+
+**What changed in revision 1** — every item is a reviewer ruling, not an
+executor edit:
+
+| Ruling | Effect on this plan |
+|---|---|
+| Threshold asymmetry = named confound | Bake-off claims are **configuration-level, never engine-level** (§2.9). Matched-threshold arm is **optional and engineering-only** |
+| Union merge = **DEFECT**, not just a risk | Fixed at Task 1 behind a **monotonicity invariant** + property test (§3.4b). S2 demoted to backstop |
+| Offline + thread caps | **Baked into image ENV.** Tested artifact = deployed artifact under default invocation |
+| Freeze lifted for one rebuild | **Task 1 is MANDATORY**, no longer conditional. Provenance becomes a stamped read afterwards |
+| Q5 wording corrected | **Blind batch v4 is NEVER a tuning corpus.** The old text said tuning "waits for v4" and that was wrong (§2.5) |
+| Correction commits | New standing rule: they carry a **grep transcript proving zero remaining instances repo-wide** |
 
 **⚠️ Read §3.5 before anything else.** Two of the conditions under which GLiNER
 was measured are properties of the **test invocation**, not of the **shipped
@@ -64,8 +77,8 @@ first is what stops a rig defect from being read as an engine result.
 
 | Task | Budget | Risk |
 |---|---|---|
-| 0 — Gate 0 answers + provenance + baseline capture | 45 min | read-only |
-| 1 — (conditional) artifact-condition fixes + ONE rebuild, re-freeze | 60 min | ⚠️ rebuild, only if Gate 0 says yes |
+| 0 — provenance hash check + baseline capture | 45 min | read-only |
+| 1 — **MANDATORY**: `_merge` fix + artifact conditions + ONE rebuild, re-freeze | 105 min | ⚠️ code change + rebuild |
 | 2 — control arm: `presidio` mode on the frozen image | 30 min | local |
 | 3 — `gliner` mode: detection + over-redaction, both paths | 60 min | local, slow |
 | 4 — `both` mode: same, plus the coverage-regression check | 60 min | local, slow |
@@ -73,7 +86,7 @@ first is what stops a rig defect from being read as an engine result.
 | 6 — synthesis, recommendation, release pre-registration | 60 min | writing |
 | 7 — ⛔ **REVIEW GATE** | — | nothing ships, nothing pushes |
 
-≈ 6 hours, or ≈ 7 with Task 1. Tasks 3–5 are slow because GLiNER is slow: a
+≈ 7 hours. Tasks 3–5 are slow because GLiNER is slow: a
 65-sample batch is **47.6 s** against presidio's **0.5 s**, and that cost is
 paid several times over.
 
@@ -101,7 +114,14 @@ engine difference, or letting a burned-set movement become a claim.
    numbers to hold, the artifact — or the template — must make it so. §3.5.
 5. **Thresholds are frozen before the run, not tuned during it.** There is no
    corpus in this project on which a threshold may legitimately be tuned: all
-   four are burned. §4/Q5.
+   four are burned. ⛔ **And blind batch v4 is NEVER a tuning corpus either** —
+   corrected at Gate 0, because revision 0 of this plan said tuning "waits for
+   v4" and that was wrong. A blind set is a **measuring instrument**; tuning
+   against it destroys it in the same act that a burned set was destroyed, and
+   it is the only unburned instrument the project has. Legitimate tuning needs
+   a **separate, purpose-built, openly-readable** corpus — the
+   `address_verify_samples.json` pattern — authored for that job and never
+   quoted. §4/Q5.
 6. **Over-redaction is path-dependent and must never be reported as one
    number.** On **batch** it has a real cost — the KB text must stay readable.
    On **live** it costs nothing, because the caller re-maps inside the
@@ -113,6 +133,14 @@ engine difference, or letting a burned-set movement become a claim.
 8. **Burned sets compare engines; they never measure the product.** Any
    sentence of the form "GLiNER improves recall to X%" is out of scope of every
    number this plan can produce.
+9. ⛔ **Every claim this bake-off makes is CONFIGURATION-level, never
+   ENGINE-level.** Ruled at Gate 0. The arms differ in threshold policy as well
+   as in engine (§3.4a), so a delta is a property of *this configuration versus
+   that configuration*, not of *GLiNER versus presidio*. Write
+   "`both` at `GLINER_THRESHOLD=0.4` redacted N more values than `presidio` at
+   its per-type floors", never "GLiNER is more accurate". The confound is named
+   **beside every delta**, not once in a caveats section — a caveat one scroll
+   away from a number does not travel with it.
 
 ---
 
@@ -229,13 +257,46 @@ characters 18-20 are now unredacted
 
 Both are redacting types, so the redaction-first rule does not separate them,
 and length decides. **Union can expose the tail of a value that presidio alone
-redacted.** This is a mechanism read from the code, not an observed failure —
-which is exactly why criterion 7 exists to look for it, and why the leak lists
-are compared line-by-line rather than by count.
+redacted.**
 
-Related and unresolved: the tie-break's third key is **score**, comparing a
-presidio confidence against a GLiNER sigmoid. **The two scales have never been
-shown to be comparable**, and nothing in the codebase claims they are.
+⛔ **RULED AT GATE 0: this is a DEFECT, and it is fixed at Task 1 — before any
+measurement.** Revision 0 treated it as a risk to *detect*; that was wrong.
+Measuring a mode that can silently lose coverage produces numbers describing a
+bug, and every downstream comparison would inherit it.
+
+The fix is stated as an **invariant**, not as a patch, because the invariant is
+what a future change has to keep:
+
+> **Monotonicity of union coverage.** For any text, the set of characters
+> redacted in `both` mode is a **superset** of the set redacted in `presidio`
+> mode. Adding an engine may never un-redact a character.
+
+Required at Task 1, all three:
+
+1. The invariant enforced in `_merge` (adding a span may not reduce covered
+   characters — a lower-ranked span survives where it covers characters the
+   winner does not).
+2. A **property test** over generated overlap geometries, not a handful of
+   hand-picked pairs. The bug is a geometry class, and examples do not cover a
+   class.
+3. The **`P=[10,20]` / `G=[5,18]`** case pinned explicitly as a regression
+   test, so the exact geometry that motivated the fix can never come back
+   silently.
+
+⚠️ **Stop condition S2 stays, demoted to a backstop.** A fixed invariant with
+no independent check is one refactor from being fixed in name only — and this
+project has been burned by exactly that shape, where the step that would have
+caught a defect was written so it always passed.
+
+⚠️ **The fix touches `presidio`-mode output too**, because `presidio` mode also
+runs through `_merge`. See §5.1: after the fix, **control-arm movement is a
+latent-defect stop, not noise.**
+
+Related and **not** fixed here: the tie-break's third key is **score**,
+comparing a presidio confidence against a GLiNER sigmoid. **The two scales have
+never been shown to be comparable**, and nothing in the codebase claims they
+are. It stays a named confound (R8) — the monotonicity fix removes the
+*coverage loss*, not the *arbitrary winner* on equal-length overlaps.
 
 **One positive, verified:** the allowlist / glossary suppression loop
 (`app.py:553-563`) runs **after** both engines and is engine-agnostic, so
@@ -361,18 +422,20 @@ uncompressed).
 | D8 | Memory | `docker stats` outside each run, **after** the batch and concurrency probes | The harness does not measure it, and an unstressed peak is not the peak |
 | D9 | What does the plan output? | A recommendation **plus** pre-registered gates for the release that would follow | A bake-off that ends in a number and no gate hands the next session an unpinned target |
 
-### Open at Gate 0 — the reviewer answers these, they are not assumed
+### ✅ Answered at Gate 0 — 2026-08-16, BINDING
 
-| # | Question | Executor's recommendation |
+Reviewer session, relayed by Teru. Verbatim text in §12.
+
+| # | Question | Ruling |
 |---|---|---|
-| **Q1** | Candidate provenance: accept the circumstantial argument in §3.2, or spend one rebuild to bake a git sha and re-freeze? | **Rebuild once with a sha, before any measurement.** Every downstream decision rests on this image, and this project's history on inferred artifact identity is bad. If rebuilt, do Q2/Q3 in the same build — one rebuild, not three |
-| **Q2** | Bake `HF_HUB_OFFLINE=1` / `TRANSFORMERS_OFFLINE=1` into the image before measuring? | **Yes.** Offline is the condition the tokenizer finding holds under, and Rule 3 should be a property of the artifact, not a hope about the pod (§3.5) |
-| **Q3** | Bake a thread cap (`OMP_NUM_THREADS=1` / `torch.set_num_threads`) or put it in the `ServingTemplate`? | **Yes, and state which layer.** Template is the more honest place — it is where "1 vCPU" is declared — but the image default must not contradict it |
-| **Q4** | Threshold asymmetry (§3.4a): compare **as-shipped**, or normalize GLiNER under `TYPE_THRESHOLDS`? | **Compare as-shipped for the bake-off**, and report the asymmetry as a named confound. Normalizing is a **detection change** and needs its own pre-registration; it must not enter as a measurement convenience |
-| **Q5** | Freeze `GLINER_THRESHOLD` at its default `0.4` for the entire bake-off? | **Yes.** There is no corpus on which it may legitimately be tuned — all four are burned. Tuning waits for blind batch v4, and that ordering is a finding, not an inconvenience |
-| **Q6** | If the control arm does **not** reproduce, what happens? | **Stop.** The rig is void, no GLiNER number is read, and the deviation is the deliverable |
-| **Q7** | Fix the false `Dockerfile` comment block (§3.6) here, or as its own commit? | **Its own commit**, outside this plan. It is comments-only and cannot change the image, but folding an unrelated correction into a measurement plan is how scope drifts |
-| **Q8** | Does this plan end at a recommendation, or carry through to a GLiNER release? | **Ends at the recommendation + the release's pre-registered gates.** The release is a separate plan with its own Gate 0, its own cutover and its own review |
+| **Q1** | Candidate provenance: accept §3.2's circumstantial argument, or rebuild with a git sha? | ✅ **REBUILD.** One build carrying sha + offline + thread cap + the `_merge` fix. **Task 1 is now MANDATORY.** Provenance becomes a stamped read afterwards; Task 0's per-file hash check **still runs** first, against the pre-rebuild candidate |
+| **Q2** | Bake `HF_HUB_OFFLINE=1` / `TRANSFORMERS_OFFLINE=1` into the image? | ✅ **YES, both vars**, in image `ENV`. Principle: **tested artifact = deployed artifact under default invocation** |
+| **Q3** | Thread cap in the image or the `ServingTemplate`? | ✅ **BOTH LAYERS** — image default *and* template declaration. The template is where "1 vCPU" is declared; the image default must agree with it, not contradict it |
+| **Q4** | Threshold asymmetry: as-shipped, or normalize GLiNER under `TYPE_THRESHOLDS`? | ✅ **AS-SHIPPED**, with the **confound named beside every delta** (not once, in a caveats section). Claims are configuration-level, never engine-level (§2.9). A matched-threshold arm is **optional and engineering-only** |
+| **Q5** | Freeze `GLINER_THRESHOLD` at `0.4`? | ✅ **FROZEN at 0.4.** And the revision-0 wording is **corrected**: ⛔ **v4 is never a tuning corpus** (§2.5) |
+| **Q6** | If the control arm does not reproduce? | ✅ **STOP, rig void.** No GLiNER number is read; the deviation is the deliverable. After the `_merge` fix, movement is a **latent-defect stop** (§5.1) |
+| **Q7** | The false `Dockerfile` comment block (§3.6)? | ✅ **SETTLED — own commit, approved**, plus a **grep transcript proving zero remaining instances repo-wide** (new standing rule) |
+| **Q8** | Recommendation only, or carry through to a release? | ✅ **RECOMMENDATION + pre-registered release gates only.** The release is a separate plan with its own Gate 0 |
 
 ---
 
@@ -383,7 +446,7 @@ not** — their numbers are the unknown this plan exists to measure, and
 inventing an expectation for them would be prediction theatre. What *is*
 registered for them is the **stop conditions**.
 
-### 5.1 Control arm — `presidio` mode on the frozen image
+### 5.1 Control arm — `presidio` mode on the RE-frozen image (Task 1 output)
 
 | Measurement | Registered value | Any other value |
 |---|---|---|
@@ -398,12 +461,27 @@ registered for them is the **stop conditions**.
 **Leak lists are compared line-by-line, never by count.** Two different sets of
 three leaks both read `108/111`.
 
+⛔ **Control-arm movement after the `_merge` fix is a LATENT-DEFECT STOP, not
+noise.** Ruled at Gate 0, and it is the sharpest rule in this plan.
+
+`presidio` mode runs through `_merge` too, so the monotonicity fix can move the
+control arm. **If it does, the movement is not an artifact of the fix — it is
+the fix revealing that presidio-alone was already losing coverage**, silently,
+in every release that shipped. The tempting reading is "we changed `_merge`, so
+of course the control moved, carry on". That reading is forbidden: it would
+convert the discovery of a shipped defect into a rounding note.
+
+On movement: **stop, and report the movement as a finding against the deployed
+`1.2.3`**, with the specific values and the span geometry that caused each.
+The bake-off does not resume until that finding is dispositioned on its own
+terms.
+
 ### 5.2 GLiNER arms — stop conditions, not predictions
 
 | # | Condition | Why it is a stop |
 |---|---|---|
 | S1 | `/v1/info` does not report the expected `engine`, or `gliner_loaded` is `false` in a GLiNER arm | The run measured something other than what it is labelled |
-| S2 | **`both` mode leaves exposed any value that `presidio` mode redacted** | The union has lost coverage — the `_merge` eviction mechanism in §3.4b. This is a defect to fix, **not** an engine result to report |
+| S2 | **`both` mode leaves exposed any value that `presidio` mode redacted** | **Backstop.** The monotonicity invariant fixed at Task 1 (§3.4b) should make this unreachable — so if it fires, the invariant is not holding and the fix is fixed in name only. Either way it is a defect, never an engine result |
 | S3 | A GLiNER arm's over-detections include a type the engine has no label for | Attribution is broken; the `engine` field is not saying what it appears to say |
 | S4 | Any arm is measured at a `GLINER_THRESHOLD` other than the frozen one | Cross-arm comparison is void |
 | S5 | Peak RSS in any arm exceeds **3 GB**, or the container exits non-zero | Pod-fitness failure — the ceiling is the pod's, not the laptop's |
@@ -432,9 +510,11 @@ yet.
 
 ## 6. Global Constraints
 
-- **Rule 3:** no outbound calls. No bare `AnalyzerEngine()`. Every GLiNER arm
-  runs with `HF_HUB_OFFLINE=1` **even if Q2 declines to bake it in** — the run
-  condition is not negotiable, only where it is declared.
+- **Rule 3:** no outbound calls. No bare `AnalyzerEngine()`. As of Task 1
+  offline is an **image property** (Q2), so the arms inherit it by default —
+  but the run commands in Appendix B still pass it **explicitly**. Belt and
+  braces is deliberate: an env var that is only ever inherited is one
+  `Dockerfile` edit from disappearing without any run failing.
 - **Rule 7:** no dependency changes. The ONNX arm is struck; `optimum` is not
   installed and `gliner` stays at `0.2.16`. Re-opening either re-opens the
   finding-11 pin chain and the tokenizer arbitration.
@@ -453,47 +533,96 @@ yet.
 
 ## 7. Per-task runbook
 
-### Task 0 — Gate 0 answers, provenance, baseline capture (read-only)
+### Task 0 — provenance + PRE-FIX baseline capture (read-only)
 
-1. Record Gate 0's answers to Q1–Q8 verbatim in this file's §12.
-2. **Provenance check** (read-only, no build): run the frozen image and hash
-   its build inputs, comparing against the git blobs at `b5fbaf6`:
+✅ Gate 0's answers are recorded in §12. Task 0 is now two things.
+
+1. **Capture the PRE-fix `presidio` baseline** on the candidate as it stands
+   today — the four gate numbers **with leak lists**, and a span dump.
+   ⚠️ **This is not ceremony and it is not the control arm.** It is the
+   reference the post-fix control arm gets diffed against, and it is the only
+   way to tell a `_merge`-fix movement from a pre-existing difference. Capture
+   it **before** Task 1 touches anything, because after the rebuild it is
+   unobtainable.
+2. **Provenance check** (read-only, no build): run the current candidate and
+   hash its build inputs, comparing against the git blobs at `b5fbaf6`:
    ```bash
    docker run --rm --entrypoint sh pii-scrubber:gliner-cand -c \
      'sha256sum /app/app.py /app/recognizers.py /app/samples.json \
                 /app/allowlist.txt /app/glossary.txt'
    git cat-file blob b5fbaf6:app.py | shasum -a 256
    ```
-   Report match or mismatch **per file**. A mismatch is a stop and makes Q1's
-   rebuild mandatory regardless of the answer given.
-3. Capture the control baseline the four gates will be compared against, and
-   record `/v1/info` in full.
+   Report match or mismatch **per file**. A mismatch does not change what
+   happens next — Task 1 rebuilds either way — but it changes what the
+   pre-fix baseline *means*, so it is recorded before that baseline is used.
 
-**Report ≤300 words.** Approval gate: the reviewer confirms Q1–Q8 and the
-provenance result before Task 1 or Task 2 begins.
+**Report ≤300 words.** No approval gate here; Gate 0 already cleared the path
+to Task 7.
 
-### Task 1 — CONDITIONAL: artifact-condition fixes, one rebuild, re-freeze
+### Task 1 — MANDATORY: the fix, the conditions, ONE rebuild, re-freeze
 
-**Only if Gate 0 authorizes it.** Everything Q1/Q2/Q3 approves goes into a
-**single** build:
+Four changes, **one build**. Nothing is measured until all four are in and the
+image is re-frozen.
 
-- a git sha baked as a build arg and surfaced on `/v1/info` (Q1),
-- `HF_HUB_OFFLINE=1` / `TRANSFORMERS_OFFLINE=1` (Q2),
-- the thread cap, at whichever layer Q3 names (Q3).
+**1. `_merge` monotonicity fix** (§3.4b) — the only code change in this plan.
 
-Then `test_gliner_tokenizer.py` re-runs in the new image and must still pass
-offline and **still fail loudly online** — the arbitration is re-proved on the
-artifact that will actually be measured, not inherited from the old one.
-Re-tag as the frozen candidate and record the new digest. **No measurement
-before this completes.**
+- **RED first:** the property test and the `P=[10,20]`/`G=[5,18]` regression
+  case must fail against today's `_merge`. A test that passes before the fix
+  tests nothing — three of eight 1.2.1 glossary frames hit exactly that, and
+  the GLiNER prefetch step survived three releases because its failure branch
+  was `echo`.
+- **GREEN:** adding a span may never reduce the covered character set.
+- Then re-run the six suites. **They are not expected to move**; if one does,
+  it is reported before anything else proceeds.
 
-### Task 2 — Control arm: `presidio` mode
+**2. Git sha** baked as a build arg, surfaced on `/v1/info` beside
+`build_version`. ⚠️ Keep `BUILD_VERSION`'s existing property: the default must
+stay non-version-shaped, so an unstamped build is distinguishable from a
+correct one. `test_build_version.py` asserts that structurally — extend it to
+cover the sha rather than working around it.
 
-Run the frozen image, `SCRUBBER_ENGINE=presidio`. Read `/v1/info` back. Run the
-selftest and the three gates.
+**3. `HF_HUB_OFFLINE=1` and `TRANSFORMERS_OFFLINE=1`** in image `ENV`
+(`Dockerfile:10` currently sets `TRANSFORMERS_OFFLINE=0`).
+⚠️ **Build-time prefetch needs network; runtime must not.** These vars must not
+be set so early that they break the weight prefetch at
+`Dockerfile:43-51`. Place them **after** the prefetch layer, and confirm the
+prefetch still succeeds — a build that silently skips the weights is the
+finding-11 failure shape returning.
 
-**Every value in §5.1 must match exactly.** Report matches as matches and any
-deviation as a **stop**, with the leak-list diff. Report ≤250 words.
+**4. Thread cap at both layers** (Q3): image `ENV` default, and the
+`ServingTemplate` declaration. They must **agree**; the point of both layers is
+that neither can silently drift from the pod's real shape.
+
+**Then, before re-freezing:**
+
+- `test_gliner_tokenizer.py` re-runs **in the new image** — must pass offline
+  and **still fail loudly online**. The arbitration is re-proved on the
+  artifact that gets measured, never inherited from the old one.
+  ⚠️ With offline now baked in, confirm the online-failure branch still works —
+  a hard-coded offline var could make the guard untriggerable, leaving a test
+  that cannot fail where it matters.
+- Tag the **pre-fix** candidate under a dated tag first (§9), then re-tag the
+  new build as the frozen candidate and **record its digest**.
+
+**No measurement before this completes.** Report ≤350 words: the RED evidence,
+the suite results, the tokenizer re-proof both ways, and the new digest.
+
+### Task 2 — Control arm: `presidio` mode on the RE-frozen image
+
+Run the re-frozen image, `SCRUBBER_ENGINE=presidio`. Read `/v1/info` back —
+including the new git sha. Run the selftest and the three gates.
+
+**Every value in §5.1 must match exactly**, and the leak lists must match
+**Task 0's pre-fix capture line for line**.
+
+Two different failures, and they are not interchangeable:
+
+| Symptom | Reading |
+|---|---|
+| Numbers differ from §5.1's registered values | **Rig void.** Something other than the four Task 1 changes is in play; stop |
+| Numbers match §5.1 but leak lists differ from Task 0's pre-fix capture | **Latent-defect stop (§5.1).** `_merge` was losing coverage on the presidio path in shipped code. Report against deployed `1.2.3`, with the span geometry per value |
+
+Report ≤250 words.
 
 ### Task 3 — `gliner` mode
 
@@ -554,9 +683,12 @@ decides whether a GLiNER release is opened.**
 | # | Risk | L | I | Mitigation | Detection |
 |---|---|---|---|---|---|
 | R1 | **GLiNER over-redacts SAP jargon that presidio suppresses**, because allowlist suppression is exact-token and GLiNER's span boundaries differ (§3.4) | **High** | **High** — unreadable KB text on the batch path | Over-detections dumped with covering text, per engine; batch readability sample judged by a human at Task 7 | Task 3/4 span dump; jargon terms appearing inside redacted spans |
-| R2 | **Measured conditions are not artifact properties** — offline and thread cap live in the run command (§3.5) | **High** | **High** — production loads a different tokenizer artifact, or thrashes threads | Q2/Q3 bake them in at Task 1 | `Dockerfile:10` reads `TRANSFORMERS_OFFLINE=0` today; no `OMP_NUM_THREADS` anywhere |
-| R3 | **Candidate provenance is asserted, not stamped** (§3.2) | Medium | **High** — every decision rests on an unidentified image | Q1 rebuild with a git sha; Task 0 hash comparison meanwhile | Task 0 step 2, per file |
-| R4 | **Union loses coverage at a span edge** via `_merge` eviction (§3.4b) | Medium | **High** — a value redacted by presidio alone leaks under `both` | S2 stop condition; line-by-line leak diff, never counts | Task 4 diff |
+| R2 | ✅ **CLOSED at Task 1** — offline and thread cap baked into image `ENV` at both layers (Q2/Q3) | — | — | Was: conditions lived in the run command (§3.5) | Re-proved by the tokenizer test in the new image, both directions |
+| R3 | ✅ **CLOSED at Task 1** — git sha baked and surfaced on `/v1/info` (Q1) | — | — | Task 0's per-file hash check still runs against the pre-rebuild candidate | Provenance becomes a stamped read |
+| R4 | ✅ **FIXED at Task 1**, not merely detected — `_merge` monotonicity invariant + property test + the pinned geometry (§3.4b) | — | — | S2 retained as backstop, because a fixed invariant with no independent check is one refactor from being fixed in name only | Task 4 diff; S2 |
+| **R4b** | **The `_merge` fix moves the presidio path**, revealing coverage loss in shipped code | Medium | **High** — a live defect in deployed `1.2.3` | Task 0 captures the pre-fix baseline **before** the fix exists; there is no other way to attribute the movement | Task 2 leak-list diff vs Task 0 |
+| **R4c** | **The `_merge` fix is fixed in name only** — invariant asserted, property test too weak to exercise the geometry | Medium | **High** — measurement resumes on an unfixed union | RED-first is mandatory: the property test and the pinned case must fail against today's `_merge` before the fix lands | Task 1 RED evidence is part of the report |
+| **R4d** | **Offline vars break the build-time weight prefetch** — set too early, the prefetch cannot download and the build produces an image with no weights | Medium | **High** — the finding-11 failure shape returning | Place the vars **after** the prefetch layer; the prefetch step already fails the build rather than warning | Task 1 confirms the prefetch succeeded, explicitly |
 | R5 | **Threshold asymmetry read as an engine difference** (§3.4a) | **High** | Medium — the wrong engine gets credit or blame | Q4 names it as a confound and forbids fixing it mid-measurement | Present by construction; must appear in every reported delta |
 | R6 | An emulated latency is quoted as the pod's | Medium | **High** — a live-path decision on a number that describes no machine | §3.8 restates both bounds; Task 5 attaches conditions to every figure | Any figure reported without its condition |
 | R7 | A burned-set gain becomes a claim | Medium | **High** — a burned figure escaping into management material | §1, §2.8 and §5.3 all state it; the reviewer holds the quotable-figure boundary | Any sentence pairing a percentage with an engine name |
@@ -576,7 +708,7 @@ deployment touch, no registry write. Scopes:
 | Scope | Action |
 |---|---|
 | Mid-task | Stop the container. Nothing persists — every arm is `docker run --rm` |
-| Conditional rebuild (Task 1) | The previous `gliner-cand` is replaced by tag. **Keep the old image under a dated tag before rebuilding**, so the pre-fix candidate remains reachable |
+| Mandatory rebuild (Task 1) | The previous `gliner-cand` is replaced by tag. **Tag the pre-fix image with a dated tag BEFORE rebuilding** — it is the only artifact that can reproduce Task 0's pre-fix baseline, and losing it makes the `_merge` movement unattributable |
 | Local commits | `git revert`; nothing is pushed before Task 7 |
 | Deployment | **Not applicable.** `daedcfe9342d21a7` runs `1.2.3` throughout and is never touched by this plan |
 
@@ -608,8 +740,11 @@ comparison.
 ## 11. What NOT to do
 
 - **Do not tune `GLINER_THRESHOLD`, `TYPE_THRESHOLDS`, or any recognizer
-  against the burned sets.** There is no corpus here on which tuning is
-  legitimate (Q5).
+  against the burned sets** — and ⛔ **not against blind batch v4 either, ever**
+  (Q5, §2.5). Tuning needs a separate, purpose-built, openly-readable corpus.
+- **Do not add the optional matched-threshold arm to any conclusion.** It is
+  engineering-only (Q4); it informs the release plan and appears in no
+  recommendation as evidence.
 - **Do not "fix" the threshold asymmetry mid-measurement.** It is a detection
   change and needs its own pre-registration (Q4).
 - **Do not rebuild after Task 1.** Frozen means frozen; a mid-run rebuild
@@ -621,15 +756,54 @@ comparison.
 - **Do not touch the deployment, and do not request a registry push grant.**
   A blocked action is a decision point, not an obstacle to route around.
 - **Do not fold the `Dockerfile` comment fix (§3.6) into this work** (Q7).
-- **Do not conclude "GLiNER is better" from a burned-set delta.** The
-  supportable conclusions are about *cost*, *coverage mechanics* and *fitness*.
+- ⛔ **Do not write an engine-level claim.** Not "GLiNER is better", not
+  "GLiNER improves recall" — the arms differ in threshold policy as well as
+  engine, so every claim is **configuration-level** and the confound is named
+  beside the number, not in a footnote (§2.9, Q4). The supportable conclusions
+  are about *cost*, *coverage mechanics* and *fitness*.
 
 ---
 
-## 12. Answered at Gate 0 — pending
+## 12. Answered at Gate 0 — 2026-08-16, BINDING
 
-Q1–Q8 in §4 are open and binding once answered. **Record the answers verbatim,
-dated and attributed**, per the "Settled" rule in `docs/HANDOVER.md`.
+Recorded **verbatim, dated, attributed**, per the "Settled" rule in
+`docs/HANDOVER.md`. **Reviewer session (Claude Cowork), relayed by Teru,
+2026-08-16.** Quoted in full, not excerpted.
+
+> Findings 1-5: ACCEPTED. Rulings:
+> 1. Threshold asymmetry: recorded as a named confound; bake-off claims
+>    are configuration-level, never engine-level. Matched-threshold arm
+>    optional, engineering-only.
+> 2. Union merge: DEFECT. Fix before measurement — monotonicity invariant
+>    (union coverage ⊇ presidio-alone coverage) + property test + the
+>    [10,20]/[5,18] case. Stop condition stays as backstop.
+> 3. Offline env + thread caps: baked into the image ENV. Tested artifact
+>    = deployed artifact under default invocation.
+> 4. Freeze lifted for ONE rebuild (fixes 2+3 + git-sha stamp), then
+>    re-frozen. Task 0 provenance becomes a stamped read.
+> 5. Dockerfile comment fix: own commit, approved. New standing rule:
+>    correction commits carry a grep transcript proving zero remaining
+>    instances repo-wide.
+>
+> Structure: control-arm-reproduces-first and no-registered-values-on-
+> measured-arms both endorsed as designed.
+
+> GATE 0: ANSWERED. Q1 rebuild (sha + offline + thread cap + _merge
+> monotonicity fix, ONE build; Task 1 now MANDATORY; control-arm movement
+> after the fix = latent-defect stop, not noise). Q2 yes, both vars.
+> Q3 both layers — image default + template declaration. Q4 as-shipped,
+> confound named per delta. Q5 frozen 0.4; v4 is never a tuning corpus —
+> fix the wording. Q6 stop, rig void. Q7 settled — own commit + grep
+> transcript. Q8 recommendation + pre-registered release gates only.
+>
+> Authorized commits: plan revision (one, folding rulings + answers),
+> HANDOVER "Settled" entry (verbatim/dated/attributed), Q7 comment fix.
+> Push approved for all three iff docs/comments-only.
+>
+> Execution order: revision + HANDOVER land -> Task 0 (provenance hash
+> check still runs, per file) -> Task 1 rebuild + re-freeze + tokenizer
+> re-proof -> Tasks 2-6 -> Task 7 review gate. Nothing pushed beyond the
+> three named commits, no deployment touch, v4 untouched.
 
 ---
 
