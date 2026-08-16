@@ -4,6 +4,24 @@ pydantic==2.10.4
 presidio-analyzer==2.2.357
 presidio-anonymizer==2.2.357
 spacy==3.8.3
-# GLiNER stack -- comment these two out to build a slim Presidio-only image
+# GLiNER stack -- comment these FOUR out to build a slim Presidio-only image.
+#
+# FINDING 11, fixed 2026-08-16. gliner 0.2.16 declares `huggingface_hub>=0.21.4`
+# with NO UPPER BOUND, so pip resolved 1.27.0 and GLiNER could never load:
+#
+#   TypeError: GLiNER._from_pretrained() missing 2 required keyword-only
+#   arguments: 'proxies' and 'resume_download'
+#
+# gliner's _from_pretrained takes both as keyword-only with no default, and
+# huggingface_hub stopped passing them at exactly 1.0.0. Measured, not
+# recalled: 0.36.2 passes both, 1.0.1 passes neither. 0.36.2 is the newest
+# version that works.
+#
+# transformers is pinned for THE SAME REASON, not its own: 5.x requires
+# huggingface-hub>=1.5.0, which drags the hub back over the 1.0 line and
+# re-breaks GLiNER. These are not two pins, they are one constraint expressed
+# twice -- raise either and GLiNER stops loading again.
 gliner==0.2.16
 torch==2.5.1
+huggingface_hub==0.36.2
+transformers==4.57.6

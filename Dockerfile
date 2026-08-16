@@ -29,9 +29,25 @@ RUN python -m spacy download ${SPACY_MODEL}
 # Comment out this block if you built without the gliner/torch requirements.
 ARG GLINER_MODEL=urchade/gliner_multi_pii-v1
 ENV GLINER_MODEL=${GLINER_MODEL}
+# ⚠️ THIS STEP MUST BE ABLE TO FAIL THE BUILD, and until 2026-08-16 it could
+# not. It ended `|| echo "WARN: GLiNER prefetch skipped"`, so a failed weight
+# download produced a GREEN BUILD WITH NO WEIGHTS -- an image that looked
+# correct and could not load a model. That is how finding 11 survived three
+# releases: the one step that would have caught it was written so it always
+# passed. A build step whose failure branch is `echo` is not a build step.
+#
+# The absent-by-design case is still handled, and ONLY that case: if gliner is
+# deliberately commented out of requirements.txt for a slim Presidio-only
+# image, the prefetch is skipped and says so. If gliner IS installed and the
+# weights cannot be baked in, the build stops here.
 RUN mkdir -p /app/hfcache && \
-    python -c "from gliner import GLiNER; GLiNER.from_pretrained('${GLINER_MODEL}')" || \
-    echo "WARN: GLiNER prefetch skipped -- image will run in presidio-only mode"
+    if python -c "import gliner" 2>/dev/null; then \
+      python -c "import os; from gliner import GLiNER; \
+m = GLiNER.from_pretrained(os.environ['GLINER_MODEL']); \
+print('GLiNER weights baked in OK:', type(m).__name__)"; \
+    else \
+      echo "GLiNER not installed -- slim presidio-only build, prefetch skipped BY DESIGN"; \
+    fi
 
 # allowlist.txt MUST ship in the image -- without it ALLOWLIST_PATH resolves
 # to a missing file and the service silently falls back to the 27-token seed,
