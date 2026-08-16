@@ -565,6 +565,27 @@ def detect(text: str, engine: str) -> List[Dict[str, Any]]:
     return _merge(spans)
 
 
+def _uncovered(start: int, end: int, kept: List[Dict[str, Any]]) -> List[tuple]:
+    """Maximal sub-intervals of [start, end) that no span in `kept` covers.
+
+    Returns [] when the range is already fully covered -- which is the case
+    the old drop-on-any-overlap rule handled correctly, and the only one.
+    """
+    out = []
+    cur = start
+    for ks, ke in sorted((k["start"], k["end"]) for k in kept):
+        if ke <= cur or ks >= end:
+            continue
+        if ks > cur:
+            out.append((cur, min(ks, end)))
+        cur = max(cur, ke)
+        if cur >= end:
+            break
+    if cur < end:
+        out.append((cur, end))
+    return out
+
+
 def _merge(spans: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Resolve overlapping spans.
@@ -575,6 +596,32 @@ def _merge(spans: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     observed for real: spaCy tags '172.16.4.8' as DATE_TIME (0.85), beating
     IP_ADDRESS (0.60), and DATE is not redacted. Protection wins over
     confidence. Then prefer longer spans, then higher scores.
+
+    COVERAGE MONOTONICITY -- added 2026-08-16, ruled a DEFECT at the bake-off
+    Gate 0. The loop used to DROP any span overlapping an already-kept one,
+    entirely, including the part nothing else covered. So adding a second
+    engine could REMOVE protection:
+
+        presidio P = [10, 20]   gliner G = [5, 18]
+        G is longer, so G is kept and P is dropped -- and characters 18-20,
+        which ONLY P covered, go out in cleartext.
+
+    Both types are redacting, so the redaction-first rule does not separate
+    them and length decides. That is a leak mechanism, not a preference.
+    Measured before the fix: 548 of 3000 random geometries lost characters.
+
+    The rule is now: a span contributes the characters nothing has covered
+    yet. Coverage therefore equals the union of every input span's
+    characters, so ADDING a span can only ADD covered characters --
+
+        coverage(presidio + gliner) is a superset of coverage(presidio alone)
+
+    which is the invariant the union mode is measured against. The sort key is
+    deliberately UNTOUCHED: it still decides which span keeps its full extent
+    and which is reduced to a remainder, and it introduces no new comparison
+    between a presidio confidence and a GLiNER score. Pinned by
+    test_merge_monotonicity.py, which carries the pre-fix algorithm verbatim
+    so the presidio path can be proved byte-identical rather than asserted.
     """
     spans.sort(key=lambda s: (
         0 if s["type"] in REDACT_TYPES else 1,
@@ -583,8 +630,11 @@ def _merge(spans: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     ))
     kept: List[Dict[str, Any]] = []
     for s in spans:
-        if not any(s["start"] < k["end"] and k["start"] < s["end"] for k in kept):
-            kept.append(s)
+        for a, b in _uncovered(s["start"], s["end"], kept):
+            piece = dict(s)
+            piece["start"], piece["end"] = a, b
+            piece["text"] = s["text"][a - s["start"]:b - s["start"]]
+            kept.append(piece)
     kept.sort(key=lambda s: s["start"])
     return kept
 
