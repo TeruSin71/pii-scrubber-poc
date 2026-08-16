@@ -1049,6 +1049,29 @@ holdout.
 
 ## Credentials
 
+### 📌 Rotation DEFERRED to project completion — decided by Teru, 2026-08-16
+
+The AI Core service key and the GitHub PAT **both transited chat on
+2026-08-15** and are still live. Rotation was raised at four consecutive
+review rounds and is now **deliberately deferred to the end of the project**,
+as an accepted risk, by the person who owns it. **This is a decision, not an
+oversight — do not re-raise it as an open finding each round.**
+
+Recorded so it survives the deferral:
+
+| | |
+|---|---|
+| **Exposed** | AI Core service key (`~/aicore-key.json`), GitHub PAT |
+| **How** | pasted into chat, 2026-08-15 |
+| **Blast radius** | one free-tier AI Core tenant; one private repo + its GHCR images |
+| **Owner** | Teru |
+| **Trigger** | project completion — **not** a date, so it cannot quietly lapse |
+| **Also then** | delete the two stale "PII Scrubber" configurations (7:19 PM / 7:33 PM) in AI Launchpad |
+
+**The trigger is the risk.** A deferral tied to an event only closes if
+someone checks at that event, so this is the last thing on the completion
+checklist, not a background intention.
+
 None are stored in this repository, and none should ever be. Registry tokens,
 GitHub tokens and BTP client secrets are supplied at the moment of use via
 environment variables and never committed, echoed into logs, or embedded in a
