@@ -3,9 +3,13 @@
 Execution record for `GATE0-overlap-suppression-plan.md`, Gate 0 answered
 2026-08-16. Every entry states what was inspected, not just a verdict.
 
-**Task 6 review-gate deliverable.** Nothing pushed. Deployment
-`daedcfe9342d21a7` runs `1.2.3` (presidio) and was never touched. Blind batch
-v4 unread, unrun, unsalted.
+**Task 6 review-gate deliverable.** Deployment `daedcfe9342d21a7` runs `1.2.3`
+(presidio) and was never touched. Blind batch v4 unread, unrun, unsalted.
+
+⚠️ **Updated after the gate:** Task 6 was ACCEPTED and the five commits were
+pushed. Origin tip is **`84c4ed1`** (`2ff5802..84c4ed1`). The lines below that
+read "nothing pushed" describe the state *at the gate*, which is when they
+were true.
 
 ---
 
