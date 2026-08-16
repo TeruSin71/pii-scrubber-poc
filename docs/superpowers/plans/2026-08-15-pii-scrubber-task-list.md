@@ -295,7 +295,9 @@ Stop and report rather than working around any of these:
 
 10. **The Step 8 network-severed test is confounded from the host** — ⚠️ **AMENDED IN THE PLAN.** `docker network disconnect bridge` also removes the **published port mapping**, so a host-side `curl localhost:8081` fails regardless of the boundary. Measured: exit **56** (recv failure), not 28. Reading that as a Rule 3 breach would be wrong; reading it as "test passed" would be worse. The real proof is `docker exec` against `localhost:8080` **inside** the container, with `docker inspect` first confirming an empty network list. Both forms are now in the runbook, with the in-container one marked as the actual evidence. Result on this image: networks empty, scrub returned `contact <PERSON> <EMAIL> at <IP_ADDRESS>` exit 0, no resolver errors in the logs.
 
-11. **GLiNER cannot load at all — `engine=both` is broken, not merely unbuilt** — ⛔ **OPEN, contradicts a settled decision.** The prefetch failure is tolerated by the Dockerfile, but the cause is not cosmetic:
+11. **GLiNER cannot load at all — `engine=both` is broken, not merely unbuilt** — ✅ **CLOSED 2026-08-16 by `1faf3e9`.** *Status corrected 2026-08-16 under the repo-wide grep rule; the historical text below is kept unchanged because the diagnosis in it is what the fix was built from.* The cause was **two** unbounded dependencies, not the one named below: `gliner` declares `huggingface_hub>=0.21.4` with no upper bound, **and** `transformers 5.x` requires `hub>=1.5.0`, which drags the hub back over the 1.0 line. The fix is therefore a **coupled** pin — `huggingface_hub==0.36.2` **with** `transformers==4.57.6` — and raising either one re-breaks GLiNER. Current status in `docs/HANDOVER.md`. ⚠️ **Every image deployed to date still predates the fix**, so `engine=both` remains fatal on `1.0.0`–`1.2.3`; enabling GLiNER needs a new build, not a configuration change.
+
+    **Historical record — the finding as it stood on 2026-08-15.** The prefetch failure is tolerated by the Dockerfile, but the cause is not cosmetic:
 
     ```
     TypeError: GLiNER._from_pretrained() missing 2 required

@@ -339,7 +339,7 @@ measured and what would ship.** Closing them is two lines in the `Dockerfile`
 it must be decided at Gate 0 and done **once, before** any measurement, never
 in the middle. Q2 and Q3.
 
-### 3.6 ⚠️ A stale comment block contradicts the shipped requirements
+### 3.6 ✅ FIXED 2026-08-16 — a stale comment block contradicted the requirements
 
 `Dockerfile:73-90` still states that finding 11 is open — *"setting engine=both
 takes the deployment down"*, *"Enabling GLiNER needs a huggingface_hub pin
@@ -354,9 +354,23 @@ now the copy that was missed — the **third** occurrence of "a correction
 applied in two of three places", the failure recorded in
 `REVIEW-1.2.3-session.md` §5.2.
 
-Comments produce no layers, so fixing it **cannot change the image**. It is out
-of scope for this plan's measurement and is listed as Q7 rather than silently
-folded in.
+Comments produce no layers, so fixing it **cannot change the image**. It was
+listed as Q7 rather than silently folded in.
+
+✅ **Fixed in its own commit, as ruled.** The grep rule that shipped with it
+immediately earned itself: the repo-wide search found **two further live false
+claims** that the Dockerfile fix alone would have left standing — the `Engine`
+row of `docs/HANDOVER.md`'s current-state table, and its `Settled` engine
+bullet, both still reading that `both` "is broken" / "does not currently work".
+**The correction was going to be applied in one of three places again**, and
+the transcript is the only reason it was not.
+
+⚠️ **One substantive fact surfaced while fixing it, and it is not cosmetic:**
+the pin fix `1faf3e9` (13:12:43) landed **64 minutes after** the `1.2.3` image
+was built (12:08:32). **Every deployed image predates the fix**, so `engine=both`
+remains fatal on `1.0.0`–`1.2.3`. Enabling GLiNER is a **new build**, never a
+configuration flip on the running pod — which is exactly what the original
+false comment claimed it was.
 
 ### 3.7 What the pod-fitness harness actually does
 

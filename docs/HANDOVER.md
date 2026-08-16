@@ -642,7 +642,7 @@ no image work — but read the build-stamp blind spot under **Settled** first.
 | Allowlist | ✅ 257,583 (`TSTC` + `DD02L`) **+ 36 glossary tokens** = 257,619. The file holds **37 entries**; `QMEL` is also in `allowlist.txt`, which loads first, so it adds nothing. Entries ≠ tokens — see the reconciliation block atop `glossary.txt` |
 | **Blind batch** | ✅ 40 samples / 50 values, **90.0%**, **zero novel failure classes** |
 | Regression suite | ✅ 108/111 (97.3%) — a gate, **not** a quotable figure |
-| Engine | `presidio` only. **`both` is broken — see finding 11.** |
+| Engine | `presidio` only **on the deployment**. Finding 11 is CLOSED (`1faf3e9`), so a build from HEAD runs `both` — but ⚠️ **every deployed image predates the fix**, so `both` is still fatal on `1.0.0`–`1.2.3`. Enabling GLiNER needs a new build, never a config flip |
 
 Rollback images, all three still in the registry:
 
@@ -725,7 +725,10 @@ was caught but typed `ORG_NAME` — redacted, mistyped, log only.
 ## Settled — do not relitigate
 
 - **Engine:** Presidio + 9 custom SAP recognizers. GLiNER stays optional behind
-  `SCRUBBER_ENGINE=both` — but see finding 11, it does not currently work.
+  `SCRUBBER_ENGINE=both`, and as of `1faf3e9` it **loads and runs** in a build
+  from HEAD — finding 11 is closed. ⚠️ **Not on any deployed image**, all of
+  which predate the fix. Whether GLiNER ships at all is the open question owned
+  by the bake-off plan.
 - **Licensing:** Apache 2.0 / MIT only. Piiranha screened out deliberately
   (CC-BY-NC-ND, non-commercial).
 - **Deployment path:** SAP AI Core BYOM via a KServe `ServingTemplate` at

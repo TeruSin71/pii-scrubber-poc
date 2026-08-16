@@ -70,23 +70,42 @@ print('GLiNER weights baked in OK:', type(m).__name__)"; \
 # leaves the weights in one layer.
 COPY --chmod=777 app.py recognizers.py samples.json allowlist.txt glossary.txt ./
 
-# Presidio-only. This is not a starting point -- it is the only mode that runs.
+# Presidio is the DEFAULT mode. As of 1faf3e9 it is no longer the only mode
+# that can run -- but "can run" and "is approved to run" are different things,
+# and the difference is the whole content of this comment.
 #
-# This comment previously read "Flip to 'both' in the AI Core configuration to
-# bring GLiNER online -- no rebuild needed." That is FALSE and it is finding 11:
-# gliner==0.2.16 is incompatible with the huggingface_hub version pip resolves,
-# so GLiNER.from_pretrained raises
+# FINDING 11 IS CLOSED (1faf3e9, 2026-08-16). An image built from THIS
+# Dockerfile loads GLiNER and serves SCRUBBER_ENGINE=both without crashing.
+# The fix is the coupled pin in requirements.txt -- huggingface_hub==0.36.2
+# with transformers==4.57.6 -- and the prefetch above now fails the build
+# rather than warning, so an image either has weights or does not exist.
+#
+# ⚠️ BUT DO NOT FLIP THE DEPLOYED CONFIGURATION TO `both`. Every image ever
+# deployed predates the fix:
+#
+#   pin fix 1faf3e9   committed 2026-08-16 13:12:43
+#   image   1.2.3     built     2026-08-16 12:08:32   <- 64 minutes EARLIER
+#
+# 1.0.0 through 1.2.3 all resolve huggingface_hub above 1.0, so on any of them
+# get_gliner() still raises
 #
 #   TypeError: GLiNER._from_pretrained() missing 2 required keyword-only
 #   arguments: 'proxies' and 'resume_download'
 #
-# get_gliner() calls exactly that at runtime, so setting engine=both takes the
-# deployment down -- and the prefetch above fails too, so no weights are baked
-# in either. Enabling GLiNER needs a huggingface_hub pin (Rule 7, needs
-# approval) and a rebuild. Owner: the GLiNER bake-off session.
+# at the first request and takes the deployment down. Enabling GLiNER needs a
+# NEW image built from this file, not a configuration change on the running
+# pod. Whether such an image ships at all is the open question owned by the
+# GLiNER bake-off plan (docs/superpowers/plans/2026-08-16-pii-scrubber-gliner-bakeoff.md).
 #
-# The same false claim was corrected in README-DEPLOY.html s7 by a9bed3e; this
-# copy was missed. Comments produce no layers, so this edit does not change the
+# ⚠️ This block was FALSE from 1faf3e9 until 2026-08-16 -- it still claimed
+# finding 11 was open and that enabling GLiNER "needs a huggingface_hub pin
+# (Rule 7, needs approval)" a day after that pin shipped. Its own closing
+# paragraph noted that the same false claim had already been missed once in
+# README-DEPLOY.html s7 and corrected by a9bed3e. It was then missed here, in
+# the file that had just finished pointing out the pattern. That is the third
+# occurrence of one correction applied in two of three places, and it is why
+# correction commits now carry a repo-wide grep transcript (HANDOVER,
+# "Settled"). Comments produce no layers, so this edit does not change the
 # tested image.
 ENV SCRUBBER_ENGINE=presidio \
     SPACY_MODEL=${SPACY_MODEL} \
