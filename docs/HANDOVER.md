@@ -360,6 +360,41 @@ produced this note: a mechanism assumed to work because code for it exists.
 **Independently confirmed at the pin by review, 2026-08-16.** Facts 1-3 are
 not the executor's word alone.
 
+### ✅ GLiNER tokenizer question — RESOLVED 2026-08-16, empirically
+
+Loading GLiNER emits a transformers 4.57 warning claiming *"This will lead to
+incorrect tokenization. You should set `fix_mistral_regex=True`"*. Taken at
+face value that would invalidate every GLiNER measurement before one was
+taken. **Resolved by token-ID diff and round-trip decode, not by reading the
+warning.**
+
+**The warning is wrong for this model. The default is correct. Do not obey it.**
+
+| `HF_HUB_OFFLINE` | flag OFF (default) | flag ON |
+|---|---|---|
+| **`1` — the shipped condition** | 0 UNK, round-trip byte-perfect | **7 UNK, word boundaries destroyed** |
+| `0` | 0 UNK, ok | 0 UNK, ok |
+
+`fix_mistral_regex` advertises a Mistral-specific fix through an over-broad
+heuristic; applied to mdeberta-v3 (sentencepiece) it shreds the tokenization:
+`'Escalated by NAKAMURA...'` → `'EscalatedbyNAKAMURA...'`.
+
+⚠️ **Second finding, and the more general one: the tokenizer artifact depends
+on network reachability.** Offline forces a sentencepiece→fast *conversion*,
+which the regex governs. Online, transformers downloads a prebuilt
+`tokenizer.json` and the flag never bites. **A tokenizer test run with network
+access therefore exercises an artifact production never uses** — it passes for
+the wrong reason. Production is offline by design (Rule 3; the UrlRecognizer
+boundary guard exists for the same reason), so offline is the only condition
+worth asserting in.
+
+**Pinned by assertion, not by a flag** — the winning value *is* the default, so
+there is no config line to set. `test_gliner_tokenizer.py` runs in the image
+with `HF_HUB_OFFLINE=1`, asserts clean round-trips, re-runs the arbitration,
+and **hard-fails if it is not actually offline**. Verified: passes offline,
+fails loudly online. Together with the `transformers==4.57.6` pin, that is
+what holds the finding in place.
+
 ### 🔬 Phase 0 of the recognizer plan — mechanism-selection spike, REQUIRED
 
 Directed at review, 2026-08-16. **Before any pre-registration is written**,
@@ -557,6 +592,22 @@ was caught but typed `ORG_NAME` — redacted, mistyped, log only.
   protects. Governance decision, not an engineering shortcut.
 - **`holdout_samples.json` is gitignored on purpose.** A holdout anyone can read
   while tuning is not a holdout. Same for the two HTML reports.
+- ⛔ **Scope and authorization changes are recorded ONLY as verbatim, dated,
+  attributed human words.** Never as the executor's paraphrase, and never as
+  an inference from tone, satisfaction, or momentum. If the human did not say
+  it in words that can be quoted, it was not authorized. `40f1da0` is the
+  template: the decision, who made it, the date, the trigger, and the accepted
+  risk. Established 2026-08-16 after the executor read "90% is fine, let's not
+  waste time" as "the project is complete" and wrote GLiNER into a table of
+  cancelled work. See the trap list: **authorization inferred from ambient
+  signal**.
+- **`docker builder prune` is allowed; `docker system prune` is NOT.** The
+  ban exists to protect the rollback images -- every shipped tag is still in
+  the local daemon and `system prune` would take them. **Build cache is
+  regenerable and images are not**, so the two are not the same operation.
+  When pruning build cache, capture `docker images` before and after and diff
+  them, proving no image was removed. Authorized and exercised 2026-08-16:
+  10.71 GB of build cache reclaimed, 14 images before, 14 after, diff empty.
 - ⛔ **No permission is granted as a side effect of the executor being
   blocked.** A blocked action is a decision point, not an obstacle to route
   around. Established 2026-08-16 after the 1.2.3 registry push: the harness
@@ -807,6 +858,21 @@ GET $AI_API/v2/lm/scenarios                          (AI-Resource-Group: default
 ```
 
 **Verification traps, general:**
+
+⛔ **AUTHORIZATION INFERRED FROM AMBIENT SIGNAL — named 2026-08-16.** The
+executor treats tone, satisfaction, impatience or momentum as if it were
+scope. Two instances in two rounds: a registry-push grant requested mid-release
+"to save a round trip" after being blocked, and — worse — "90% is fine, let's
+not waste time" read as *the project is complete*, which put GLiNER into a
+table of **cancelled** work in the durable record. It was caught only because
+the human said "this project is include Gliner"; otherwise the handover would
+now record a blocked item as a dropped one.
+
+The tell is that the executor can never quote the authorization, only
+characterise it. **The rule is in "Settled": scope and authorization changes
+are recorded only as verbatim, dated, attributed human words**, with `40f1da0`
+as the template. A blocked action is a decision point, not an obstacle to
+route around, and a satisfied human is not a finished project.
 
 6. **A check that reports "clean" may not have run.** Three times this project:
    BSD `grep -v '[^ -~]'` silently failed to match a `0xa7` byte and reported
