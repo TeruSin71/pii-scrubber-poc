@@ -13,9 +13,13 @@ because inheriting a property silently is how it gets broken later:
      "basis" the ordinary word
   2. the +/-40-char user-context backstop -- a glossary entry may veto a
      PATTERN, never CONTEXT. "posted by Driver" still redacts.
-  3. whole-span exact matching   -- "Driver" suppresses the single-token span
-     only; a genuine "Driver Logistics Ltd" ORG span is multi-token and can
-     never match the entry.
+  3. ALL-TOKENS matching (was whole-span exact until 2026-08-16) -- a span
+     is suppressed only when EVERY token in it is independently
+     suppressible. "Driver" suppresses the single-token span; a genuine
+     "Driver Logistics Ltd" ORG span still cannot match, because Logistics
+     and Ltd are not entries. The behaviour these tests assert is unchanged;
+     the mechanism reaching it is not. See test_overlap_suppression.py and
+     GATE0-overlap-suppression-plan.md.
 
 Every entry earns its place by fixing an OBSERVED over-detection. Entries
 that merely look plausible are not shipped -- a glossary can grow for free in
@@ -92,7 +96,7 @@ check("'reported by Config' still redacts",
 check("'changed by Payer' still redacts",
       redacted("Master record changed by Payer last Thursday.", "Payer"))
 
-print("Leak guard -- whole-span matching, multi-token spans unaffected")
+print("Leak guard -- ALL-TOKENS matching, mixed multi-token spans unaffected")
 check("'Driver Logistics Ltd' still redacts",
       redacted("Carrier is Driver Logistics Ltd and the rate card is stale.", "Driver Logistics Ltd"),
       A.scrub("Carrier is Driver Logistics Ltd and the rate card is stale.", "batch")["scrubbed_text"])

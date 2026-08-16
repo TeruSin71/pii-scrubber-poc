@@ -167,8 +167,9 @@ ALLOWLIST_PATH = os.getenv("ALLOWLIST_PATH", str(Path(__file__).parent / "allowl
 
 # Hand-curated SAP jargon, loaded into the SAME set through the SAME loader.
 # It is data, not mechanism -- so it inherits case-sensitive exact match, the
-# +/-40-char user-context backstop, and whole-span matching, instead of
-# reimplementing any of them. A glossary entry may veto a PATTERN, never
+# +/-40-char user-context backstop, and ALL-TOKENS span matching (whole-span
+# exact until 2026-08-16; see _suppress_span), instead of reimplementing any
+# of them. A glossary entry may veto a PATTERN, never
 # CONTEXT: "posted by Driver" still redacts. See glossary.txt and
 # test_jargon.py.
 GLOSSARY_PATH = os.getenv("GLOSSARY_PATH", str(Path(__file__).parent / "glossary.txt"))
@@ -528,6 +529,102 @@ def _in_user_context(text: str, start: int, end: int) -> bool:
     return bool(_USER_CONTEXT_RE.search(text[lo:hi]))
 
 
+# --------------------------------------------------------------------------
+# Overlap-aware suppression -- ALL-TOKENS semantics.
+#
+# Until 2026-08-16 suppression compared the WHOLE span text against
+# ALLOWLIST_EXACT. GLiNER emits multi-word spans ('FSD ZCO_ALLOC_CYCLE',
+# 'VF04 collective run'), so the lookup never fired and the jargon
+# protections were unreachable for them. This is the fix.
+#
+# ⚠️ THE SEMANTICS ARE ALL-TOKENS, AND THE ALTERNATIVE WAS DISQUALIFIED BY
+# MEASUREMENT, NOT TASTE. The obvious reading -- "suppress a span that
+# CONTAINS a protected token" -- un-redacts real values, because protected
+# tokens live inside real PII:
+#
+#     'PO Box 91020, Auckland'   PO   is a glossary entry   (holdout_v3 V3-024)
+#     '44 Bellbird Rise'         Rise is a glossary entry   (eval_v2   V2-008)
+#
+# Measured before the change: whole-span containment exposed three planted
+# ADDRESS values across the corpora, two of them on the presidio path, i.e.
+# a leak in shipped configuration. So a span is suppressed only when EVERY
+# one of its tokens is independently suppressible -- which cannot remove a
+# character the pre-change rule protected, because a single-token span is
+# just the one-token case of the same test. Gate 0 Q2, permanently ruled.
+#
+# Two further properties, both load-bearing and both pinned by tests:
+#
+#   * The user-context backstop is evaluated at EACH TOKEN'S OWN offsets and
+#     every token must clear it (Q5). The question the backstop answers is
+#     "is THIS token being used as an actor", which is a property of where
+#     the token sits, not of where its span starts.
+#   * This is a PURE FUNCTION of (text, span offsets). It never consults the
+#     other spans. That is what makes the union-coverage monotonicity
+#     invariant -- coverage(both) is a superset of coverage(presidio) --
+#     survive this change by construction rather than by re-argument: the
+#     presidio span set is identical in both modes, so an independent
+#     per-span filter removes the same spans from both.
+# --------------------------------------------------------------------------
+_SPAN_TOKEN_RE = re.compile(r"\S+")
+_TOKEN_PUNCT = ".,;:'\"()"
+
+
+def _span_tokens(text: str, start: int, end: int):
+    """(token, token_start, token_end) for each token in text[start:end).
+
+    Whitespace-delimited, surrounding punctuation stripped, empty tokens
+    dropped. Offsets are ABSOLUTE into `text`, which is what lets the
+    backstop be evaluated at each token's own position.
+
+    Sliced from `text` by offset rather than read from the span's own `text`
+    field: the two agree for both engines, and the offsets are the half that
+    has to be right for the backstop window to land in the correct place.
+    """
+    out = []
+    for m in _SPAN_TOKEN_RE.finditer(text[start:end]):
+        raw = m.group()
+        token = raw.strip(_TOKEN_PUNCT)
+        if not token:
+            continue
+        lead = len(raw) - len(raw.lstrip(_TOKEN_PUNCT))
+        off = start + m.start() + lead
+        out.append((token, off, off + len(token)))
+    return out
+
+
+def _token_protected(token: str) -> bool:
+    """A known technical token, or the deterministic customer-namespace rule."""
+    return (token in ALLOWLIST_EXACT) or is_custom_sap_object(token)
+
+
+def _token_clears_backstop(text: str, token: str, start: int, end: int) -> bool:
+    """May this token be suppressed given what surrounds it?
+
+    Shape decides how much the backstop applies, exactly as before:
+    underscore/digit/namespace tokens are unambiguously technical and a
+    surname-style user ID cannot take that shape, so they are unconditional.
+    Pure-alpha tokens are the collision class (KLEIN, MARA, BRAUN) and are
+    refused when a user-context word sits within +/-40 characters.
+    """
+    unambiguous = ("_" in token or any(c.isdigit() for c in token)
+                   or bool(NAMESPACE_RE.match(token)))
+    return unambiguous or not _in_user_context(text, start, end)
+
+
+def _suppress_span(text: str, start: int, end: int) -> bool:
+    """True if this span is entirely technical and may be dropped.
+
+    ALL tokens protected AND ALL tokens clearing the backstop. An empty span
+    is never suppressed -- 'no tokens' must not vacuously satisfy 'every
+    token is protected'.
+    """
+    toks = _span_tokens(text, start, end)
+    if not toks:
+        return False
+    return (all(_token_protected(t) for t, _, _ in toks)
+            and all(_token_clears_backstop(text, t, s, e) for t, s, e in toks))
+
+
 def detect(text: str, engine: str) -> List[Dict[str, Any]]:
     spans: List[Dict[str, Any]] = []
 
@@ -552,31 +649,23 @@ def detect(text: str, engine: str) -> List[Dict[str, Any]]:
                 "engine": "gliner",
             })
 
-    # Drop spans that are a known technical token (exact case) or that match
-    # the deterministic customer-namespace rule -- UNLESS the span sits in
-    # user context (see _in_user_context). This is the automated backstop for
-    # the all-caps collision: case sensitivity protects "Mara" the person from
-    # MARA the table, but an SAP *user ID* is all-caps by convention, so a
-    # real user ID of KLEIN or BRAUN is byte-identical to the allowlistable
-    # token. An allowlist may veto a pattern; it must not veto context.
+    # Drop spans that are entirely known technical tokens (exact case) or the
+    # deterministic customer-namespace rule -- UNLESS a token sits in user
+    # context. This is the automated backstop for the all-caps collision:
+    # case sensitivity protects "Mara" the person from MARA the table, but an
+    # SAP *user ID* is all-caps by convention, so a real user ID of KLEIN or
+    # BRAUN is byte-identical to the allowlistable token. An allowlist may
+    # veto a pattern; it must not veto context.
     # "Check table KLEIN" -> suppressed; "posted by KLEIN" -> still redacted.
-    # Shape decides how much the context backstop applies:
-    #   * underscore/digit/namespace tokens (ZSD_REBATE_CALC, VA01, /IWFND/..)
-    #     are unambiguously technical -- suppression is unconditional. A
-    #     surname-style user ID cannot take this shape.
-    #   * pure-alpha tokens (KLEIN, MARA, VBAK) are the collision class --
-    #     suppression is refused when user context is present.
-    kept = []
-    for s in spans:
-        token = s["text"].strip().strip(".,;:'\"()")
-        suppressible = (token in ALLOWLIST_EXACT) or is_custom_sap_object(token)
-        if suppressible:
-            unambiguous = ("_" in token or any(c.isdigit() for c in token)
-                           or bool(NAMESPACE_RE.match(token)))
-            if unambiguous or not _in_user_context(text, s["start"], s["end"]):
-                continue
-        kept.append(s)
-    spans = kept
+    #
+    # ALL-TOKENS, not any-token: see _suppress_span. Multi-word spans are now
+    # reachable, and values that merely CONTAIN a protected token ('PO Box
+    # 91020, Auckland') are not.
+    #
+    # Runs BEFORE _merge and is a pure per-span function, which is what keeps
+    # the union-coverage monotonicity invariant true by construction.
+    spans = [s for s in spans
+             if not _suppress_span(text, s["start"], s["end"])]
 
     return _merge(spans)
 

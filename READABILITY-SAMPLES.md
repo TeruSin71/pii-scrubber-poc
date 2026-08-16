@@ -1,23 +1,44 @@
-# Batch-path readability — union vs presidio
+# Batch-path readability — union vs presidio, AFTER overlap-aware suppression
 
-**Task 7 input. Batch path only: the KB text must stay readable, so an**
-**extra redaction has a real cost here. On the live path it costs nothing.**
+**Task 4 deliverable of `GATE0-overlap-suppression-plan.md`, 2026-08-16.** Replaces the
+bake-off's ten-sample file. **All 21 zero-PII controls**, which is the metric the
+batch path is blocked on — an extra redaction here has a real cost, because the KB
+text must stay readable. On the live path it costs nothing.
 
-Ten samples: the seven with the most union over-redaction, then three with
-none, for contrast. `over` lists spans covering no planted value, with the
-engine whose span won the merge.
+⛔ **Controls damaged: `both` 7 of 21 (33%) · `presidio` 2 of 21 (9.5%).** Before this
+change the union damaged 8. **7/21 is never to be reported without 2/21 beside it**
+(Gate 0 Q9): the change is a PASS for the plan and a CONTINUED-BLOCK for batch.
+
+Measured on `pii-scrubber:gliner-cand@sha256:d96edef4…c764912` with the changed
+`app.py` and `glossary.txt` mounted over `/app`. `GLINER_THRESHOLD` frozen at 0.4.
 
 ---
 
-### 1. `HO-015` — holdout_samples.json
+## Still damaged — 7 of 21
+
+### `TKT-0009` — samples.json
+
+**original**
+
+> Batch determination failing for material in outbound delivery. This one is purely technical - class 023 characteristic mismatch. No customer or contact details involved.
+
+**presidio** — unchanged
+
+**both (union)**
+
+> Batch determination failing for material in outbound delivery. This one is purely technical - class 023 characteristic mismatch. No <PERSON> or contact details involved.
+
+over-redacted by union: `customer` (gliner/PERSON)
+
+---
+
+### `HO-015` — holdout_samples.json
 
 **original**
 
 > PGI failing on plant 4000 deliveries since the morning batch window. No customer or personal data in this one - purely a movement type 601 configuration question.
 
-**presidio**
-
-> PGI failing on plant 4000 deliveries since the morning batch window. No customer or personal data in this one - purely a movement type 601 configuration question.
+**presidio** — unchanged
 
 **both (union)**
 
@@ -27,87 +48,31 @@ over-redacted by union: `plant` (gliner/ORG_NAME), `4000` (gliner/CUSTOMER_NO), 
 
 ---
 
-### 2. `V3-003` — holdout_v3.json
+### `HO-021` — holdout_samples.json
 
 **original**
 
-> Raised by Søren Kjær (soren.kjaer@ourcompany.example) about Danish VAT determination on export orders to Norway.
+> When VL02N refuses to post goods issue with 'deficit of stock', first check MMBE for the storage location split, then MB52 for blocked stock. This is config knowledge, no customer specifics required.
 
 **presidio**
 
-> Raised by <PERSON> (<EMAIL>) about <ORG_NAME> <ORG_NAME> determination on export orders to <ADDRESS>.
+> When VL02N refuses to post goods issue with 'deficit of stock', first check MMBE for the storage location split, then MB52 for blocked stock. This is <PERSON>, no customer specifics required.
 
 **both (union)**
 
-> Raised by <PERSON> (<EMAIL>) about <ORG_NAME> <ORG_NAME> determination on export orders to <ADDRESS>.
+> When VL02N refuses to post goods issue with 'deficit of stock', first check MMBE for the storage location split, then MB52 for blocked stock. This is <PERSON>, no customer specifics required.
 
-over-redacted by union: `Danish` (presidio/ORG_NAME), `VAT` (presidio/ORG_NAME), `Norway` (presidio/ADDRESS)
-
----
-
-### 3. `TKT-0003` — samples.json
-
-**original**
-
-> Invoice IDoc failing in VF04 collective run. Bill-to customer 0001099233. Finance contact Meera Patel (meera.patel@globex.com) escalated; remittance IBAN NZ29 0011 2233 4455 6677 88 rejected by bank.
-
-**presidio**
-
-> <ORG_NAME> failing in VF04 collective run. <PERSON>-to customer <CUSTOMER_NO>. Finance contact <PERSON> (<EMAIL>) escalated; remittance IBAN <IBAN> rejected by bank.
-
-**both (union)**
-
-> <ORG_NAME> failing in VF04 collective run. <PERSON>-to customer <CUSTOMER_NO>. Finance contact <PERSON> (<EMAIL>) escalated; remittance IBAN <IBAN> rejected by bank.
-
-over-redacted by union: `Invoice IDoc` (presidio/ORG_NAME), `Bill` (presidio/PERSON)
+over-redacted by union: `config knowledge` (presidio/PERSON)
 
 ---
 
-### 4. `HO-006` — holdout_samples.json
-
-**original**
-
-> ATP check timing out. Raised by Priyanka Sharma (priyanka.sharma@ourcompany.example), desk phone 04 803 5522, employee in the Wellington office at 22 Willis Street.
-
-**presidio**
-
-> ATP check timing out. Raised by <PERSON> (<EMAIL>), desk phone <PHONE>, employee in the <ADDRESS> office at <ADDRESS>
-
-**both (union)**
-
-> <ORG_NAME> check timing out. Raised by <PERSON> (<EMAIL>), desk phone <PHONE>, employee in the <ORG_NAME> at <ADDRESS>
-
-over-redacted by union: `ATP` (gliner/ORG_NAME), `Wellington office` (gliner/ORG_NAME)
-
----
-
-### 5. `HO-031` — holdout_samples.json
-
-**original**
-
-> Warehouse cannot print delivery notes at the Christchurch DC, 47 Halswell Junction Road. Site contact is the shift lead Mere Tuhoe on 03 344 7621. Printer queue ZLP_CHC01 shows 200 jobs.
-
-**presidio**
-
-> Warehouse cannot print delivery notes at <ORG_NAME>, <ADDRESS> Site contact is the shift lead Mere Tuhoe on <PHONE>. Printer queue ZLP_CHC01 shows 200 jobs.
-
-**both (union)**
-
-> <ORG_NAME> cannot print delivery notes at <ORG_NAME><ADDRESS> Site contact is the shift lead <PERSON> on <PHONE>. Printer queue ZLP_CHC01 shows 200 jobs.
-
-over-redacted by union: `Warehouse` (gliner/ORG_NAME), `the ` (presidio/ORG_NAME)
-
----
-
-### 6. `V2-064` — eval_samples_v2.json
+### `V2-064` — eval_samples_v2.json
 
 **original**
 
 > Movement type 601 posts against storage location 0001 for plant 4000, and there are 40 open transfer orders on the queue.
 
-**presidio**
-
-> Movement type 601 posts against storage location 0001 for plant 4000, and there are 40 open transfer orders on the queue.
+**presidio** — unchanged
 
 **both (union)**
 
@@ -117,74 +82,224 @@ over-redacted by union: `storage location 0001` (gliner/ADDRESS), `plant 4000` (
 
 ---
 
-### 7. `V3-020` — holdout_v3.json
+### `V3-033` — holdout_v3.json
 
 **original**
 
-> Redirect the pallet to 12 Kowhai Close, Tauranga 3110, the site office will sign between 8 and 4.
+> Invoice blocked again, 3 Way match failed against the goods receipt for plant 4100. Tolerance key is fine, no customer data here.
 
-**presidio**
-
-> Redirect the pallet to <ADDRESS>, the site office will sign between 8 and 4.
+**presidio** — unchanged
 
 **both (union)**
 
-> Redirect the pallet to <ADDRESS>, the <ORG_NAME> will sign between <PHONE>.
+> Invoice blocked again, 3 Way match failed against the goods receipt for <ORG_NAME>. Tolerance key is fine, no customer data here.
 
-over-redacted by union: `site office` (gliner/ORG_NAME), `8 and 4` (gliner/PHONE)
+over-redacted by union: `plant 4100` (gliner/ORG_NAME)
 
 ---
 
-### 8. `TKT-0001` — samples.json
+### `V3-034` — holdout_v3.json
 
 **original**
 
-> IDoc stuck in status 51 for sales order to customer 0001045567 (Harbour Freight Ltd). Error: 'ship-to party not found'. Reported by Aroha Ngata, aroha.ngata@harbourfreight.co.nz, ph +64 21 554 8890. Please advise.
+> Postings to GL account 400000 doubled after the FX rate load on Tuesday. TCURR looks fine, config-only question.
 
 **presidio**
 
-> IDoc stuck in status 51 for sales order to customer <CUSTOMER_NO> (<ORG_NAME>). Error: 'ship-to party not found'. Reported by <PERSON>, <EMAIL>, ph <PHONE>. Please advise.
+> Postings to GL account <CUSTOMER_NO> doubled after the FX rate load on Tuesday. TCURR looks fine, config-only question.
 
 **both (union)**
 
-> IDoc stuck in status 51 for sales order to customer <CUSTOMER_NO> (<ORG_NAME>). Error: 'ship-to party not found'. Reported by <PERSON>, <EMAIL>, ph <PHONE>. Please advise.
+> Postings to GL account <CUSTOMER_NO> doubled after the FX rate load on Tuesday. TCURR looks fine, config-only question.
 
-over-redacted by union: none
+over-redacted by union: `400000` (presidio/CUSTOMER_NO)
 
 ---
 
-### 9. `TKT-0004` — samples.json
+### `V3-040` — holdout_v3.json
 
 **original**
 
-> CPI iFlow to endpoint 10.42.7.19 returning 500 on outbound delivery. Integration owner Tomasz Kowalski, tomasz.kowalski@acme-logistics.pl. Affects shipments for customer 0001200456.
+> VF04 collective run picks zero items when the billing block sits at header level. See the OSS note, config only.
 
-**presidio**
-
-> CPI iFlow to endpoint <IP_ADDRESS> returning 500 on outbound delivery. Integration owner <PERSON>, <EMAIL>. Affects shipments for customer <CUSTOMER_NO>.
+**presidio** — unchanged
 
 **both (union)**
 
-> CPI iFlow to endpoint <IP_ADDRESS> returning 500 on outbound delivery. Integration owner <PERSON>, <EMAIL>. Affects shipments for customer <CUSTOMER_NO>.
+> <ORG_NAME> picks zero items when the billing block sits at <ADDRESS>. See the OSS note, config only.
 
-over-redacted by union: none
+over-redacted by union: `VF04 collective run` (gliner/ORG_NAME), `header level` (gliner/ADDRESS)
 
 ---
 
-### 10. `TKT-0005` — samples.json
+## Clean — 14 of 21
+
+### `EXP-0001` — samples.json
 
 **original**
 
-> Output type not triggering for order confirmation. NAST record missing. Requested by Sione Tuilagi from Pacific Traders, phone 09 445 2210, sione.t@pacifictraders.example.
+> Known issue: when IDoc is in status 51 with 'ship-to party not found', check the customer-material info record (VD51N) and the partner function assignment in the sold-to master. Usually the ship-to (SH) partner is missing on the customer account group. No customer data needed to resolve.
 
-**presidio**
+**presidio** — unchanged
 
-> Output type not triggering for order confirmation. NAST record missing. Requested by <PERSON> from <ORG_NAME>, phone <PHONE>, <EMAIL>.
+**both (union)** — unchanged
 
-**both (union)**
+---
 
-> Output type not triggering for order confirmation. NAST record missing. Requested by <PERSON> from <ORG_NAME>, phone <PHONE>, <EMAIL>.
+### `HO-020` — holdout_samples.json
 
-over-redacted by union: none
+**original**
+
+> Intercompany billing IDoc failed price determination between company codes 4000 and 4100. Purely config - condition ZIC1 missing in the procedure. Nothing sensitive here.
+
+**presidio** — unchanged
+
+**both (union)** — unchanged
+
+---
+
+### `HO-029` — holdout_samples.json
+
+**original**
+
+> FSD ZCO_ALLOC_CYCLE: monthly assessment cycle automation. Pure config documentation - cycle names, segment logic, sender/receiver rules. Contains no personal or customer data by design.
+
+**presidio** — unchanged
+
+**both (union)** — unchanged
+
+✅ **repaired by overlap-aware suppression:** `FSD ZCO_ALLOC_CYCLE` (gliner/ORG_NAME)
+
+---
+
+### `HO-039` — holdout_samples.json
+
+**original**
+
+> Exchange rate type M not updating from the feed since Tuesday. TCURR last entry 12.08. Basis checking the RFC destination. Config-only issue, no personal data.
+
+**presidio** — unchanged
+
+**both (union)** — unchanged
+
+---
+
+### `V2-060` — eval_samples_v2.json
+
+**original**
+
+> Invoice blocked, 3 Way match failed against the goods receipt and the tolerance key is too tight.
+
+**presidio** — unchanged
+
+**both (union)** — unchanged
+
+---
+
+### `V2-061` — eval_samples_v2.json
+
+**original**
+
+> Scan 20 Pallet Rack Row before picking, then check 12 Handling Unit Place assignments in the monitor.
+
+**presidio** — unchanged
+
+**both (union)** — unchanged
+
+---
+
+### `V2-062` — eval_samples_v2.json
+
+**original**
+
+> VF04 collective run fails when NAST has no entry, check MARA and VBAK before raising it with Basis.
+
+**presidio** — unchanged
+
+**both (union)** — unchanged
+
+---
+
+### `V2-063` — eval_samples_v2.json
+
+**original**
+
+> ZSD_REBATE_CALC dumps in the update task and /SOVOSD/RFYTXDISPLAY has the same short dump signature.
+
+**presidio** — unchanged
+
+**both (union)** — unchanged
+
+---
+
+### `V2-065` — eval_samples_v2.json
+
+**original**
+
+> Escalated to Level 3 support and routed to Basis for the ST22 dump, no customer specifics required.
+
+**presidio** — unchanged
+
+**both (union)** — unchanged
+
+---
+
+### `V3-035` — holdout_v3.json
+
+**original**
+
+> Driver could not get dock access yesterday and the Rise in failed deliveries since the WM cutover needs a root cause.
+
+**presidio** — unchanged
+
+**both (union)** — unchanged
+
+---
+
+### `V3-036` — holdout_v3.json
+
+**original**
+
+> Close the stuck transfer orders in LT23 and check MB52 for blocked stock before month end. Level 3 support not required.
+
+**presidio** — unchanged
+
+**both (union)** — unchanged
+
+---
+
+### `V3-037` — holdout_v3.json
+
+**original**
+
+> ST22 shows a TIME_OUT dump in program ZSD_REBATE_CALC, movement type 601 unaffected. Pure configuration question.
+
+**presidio** — unchanged
+
+**both (union)** — unchanged
+
+---
+
+### `V3-038` — holdout_v3.json
+
+**original**
+
+> MARA and MAKT are out of sync after the MDG load, NAST entries missing for output type ZBA0. Basis are aware.
+
+**presidio** — unchanged
+
+**both (union)** — unchanged
+
+---
+
+### `V3-039` — holdout_v3.json
+
+**original**
+
+> ATP check and PGI both fine after the patch, MRP run completes. RFC destination re-tested, no personal data in this one.
+
+**presidio** — unchanged
+
+**both (union)** — unchanged
 
 ---

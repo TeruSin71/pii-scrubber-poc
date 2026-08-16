@@ -1102,8 +1102,12 @@ asserts the ADDRESS recognizer declines it, and `Way` still comes out
 
 **Addressed in 1.2.0 by `glossary.txt`** — 29 entries, loaded through the same
 loader into the same suppression set as `allowlist.txt`, so it inherits
-case-sensitive exact match, the ±40-char user-context backstop and whole-span
-matching rather than reimplementing them.
+case-sensitive exact match, the ±40-char user-context backstop and span
+matching rather than reimplementing them. ⚠️ **The span-matching half changed
+on 2026-08-16**: whole-span exact became **ALL-TOKENS** — a span is suppressed
+only when every token in it is independently suppressible. The glossary's
+behaviour is unchanged; multi-word spans of pure jargon are now reachable.
+See `GATE0-overlap-suppression-plan.md`.
 
 **Shipping criterion is "observed misfire", not "proven safe."** Every entry
 traces to an incident — a redacting span that covered no expected value in
