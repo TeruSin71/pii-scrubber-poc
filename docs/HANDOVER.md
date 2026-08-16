@@ -27,16 +27,35 @@ Two paths through the service:
 
 ---
 
-## ⏳ 1.2.3 — IN PROGRESS, NOT SHIPPED. Read this first.
+## ⏳ 1.2.3 — SHIPPED AND CUT OVER, ⚠️ NOT YET VERIFIED. Read this first.
 
-**7 commits exist locally and NONE is pushed.** The remote and the deployment
-are both at `1.2.2`, which is correct and running. Nothing here is live.
+Code pushed, image published, template repointed, cutover performed. **The one
+step still outstanding is reading the deployment back.**
 
 ```
-origin/deploy/aicore-poc  9734841   (1.2.2 close-out)
-local HEAD                2ca8c77   7 commits ahead, review-before-push in force
-deployment                da1b1b3e39367c59, running 1.2.2, healthy
+origin/deploy/aicore-poc  42c3829   in sync, nothing unpushed
+image                     ghcr.io/terusin71/pii-scrubber:1.2.3
+digest                    sha256:9fcc4337...58d080735   linux/amd64 + attestation
+template                  -> :1.2.3   rollback comment names 1.2.2
+deployment                daedcfe9342d21a7   replaces da1b1b3e39367c59 (deleted)
 ```
+
+⚠️ **`daedcfe9342d21a7` is UNVERIFIED.** A deployment ID proves a deployment
+was created, not that it pulled the right image or that it is healthy.
+**Identity is checked, not inferred** — until `GET .../v1/info` echoes
+`build_version` exactly `1.2.3`, the running build is unknown. Do not record
+1.2.3 as live, and do not quote any deployed number, before that call returns.
+
+To close it:
+
+```bash
+source ~/.aicore-env 2>/dev/null || echo "re-mint AI_API and TOKEN first"
+curl -s -H "Authorization: Bearer $TOKEN" -H "AI-Resource-Group: default" \
+  "$AI_API/v2/inference/deployments/daedcfe9342d21a7/v1/info" | python3 -m json.tool
+```
+
+Expect `build_version` `"1.2.3"`, `unmapped_labels` `null` before first scrub
+and `["FAC"]` after, and `unmapped_labels_semantics` present in both.
 
 | Item | State |
 |---|---|
@@ -224,8 +243,8 @@ no image work — but read the build-stamp blind spot under **Settled** first.
 
 | Area | State |
 |---|---|
-| Deployment | **`da1b1b3e39367c59`** on SAP AI Core — deployed check not yet read, see the block above |
-| Image | ✅ `ghcr.io/terusin71/pii-scrubber:1.2.2`, **linux/amd64**, `sha256:958bd5c3…b3ff3fa6` |
+| Deployment | **`daedcfe9342d21a7`** on SAP AI Core — ⚠️ **cut over, NOT yet read back.** See the 1.2.3 block at the top |
+| Image | ✅ `ghcr.io/terusin71/pii-scrubber:1.2.3`, **linux/amd64**, `sha256:9fcc4337…58d080735` (1.2.2 `sha256:958bd5c3…b3ff3fa6` is the rollback) |
 | GitHub | ✅ `https://github.com/TeruSin71/pii-scrubber-poc` — **private**, branch `deploy/aicore-poc` |
 | AI Core Git sync | ✅ application `pii-scrubber-app` → repo `pii-scrubber-poc`, **path `workflows`**, revision `deploy/aicore-poc` |
 | Scenario | ✅ `pii-scrubber`, version `1.0`, executable `pii-scrubber` |
@@ -242,10 +261,10 @@ Rollback images, all three still in the registry:
 
 ⚠️ **The deployment ID changes on every release.** `d5e6ea76217ed207` was
 1.1.0; `db3d9cc5eea296cd` was 1.2.0; `d08c99a19640540f` was 1.2.1;
-**`da1b1b3e39367c59` is 1.2.2.** Each predecessor is deleted, not stopped —
-the 1-pod quota forces delete-then-create and Kubernetes never re-drives an
-admission-rejected revision. `test_deployed.py` now defaults to
-`da1b1b3e39367c59`.
+`da1b1b3e39367c59` was 1.2.2; **`daedcfe9342d21a7` is 1.2.3.** Each
+predecessor is deleted, not stopped — the 1-pod quota forces
+delete-then-create and Kubernetes never re-drives an admission-rejected
+revision. `test_deployed.py` now defaults to `daedcfe9342d21a7`.
 
 A script pointing at a dead ID fails loudly. A script pointing at a *stale but
 live* one reports confident numbers for the wrong artifact, silently — that is
@@ -875,7 +894,7 @@ python test_label_map.py        # 37  unmapped-label diagnostic, failure isolati
 #   holdout_samples.json  108/111   eval_samples_v2.json  65/68
 #   holdout_v3.json        45/50    /v1/selftest          45/45, over_detections 4
 
-# against the deployment (DEPLOYMENT_ID defaults to da1b1b3e39367c59)
+# against the deployment (DEPLOYMENT_ID defaults to daedcfe9342d21a7)
 export AI_API=... TOKEN=...
 python3 test_deployed.py holdout_samples.json
 
