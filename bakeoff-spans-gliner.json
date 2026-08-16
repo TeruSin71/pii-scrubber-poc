@@ -1,0 +1,936 @@
+{
+ "batch": {
+  "by_engine": {
+   "gliner": {
+    "on_value": 256,
+    "over": 57
+   }
+  },
+  "over": [
+   {
+    "corpus": "samples.json",
+    "id": "TKT-0009",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.806,
+    "text": "customer"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-006",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.592,
+    "text": "ATP"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-006",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.678,
+    "text": "Wellington office"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-009",
+    "engine": "gliner",
+    "type": "IBAN",
+    "score": 0.415,
+    "text": "account number"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-011",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.924,
+    "text": "Auckland shared services team"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-015",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.842,
+    "text": "plant"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-015",
+    "engine": "gliner",
+    "type": "CUSTOMER_NO",
+    "score": 0.53,
+    "text": "4000"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-015",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.493,
+    "text": "customer"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-018",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.967,
+    "text": "warehouse team"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-024",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.655,
+    "text": "company"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-029",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.814,
+    "text": "FSD ZCO_ALLOC_CYCLE"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-031",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.985,
+    "text": "Warehouse"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-033",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.799,
+    "text": "warehouse office"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-034",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.486,
+    "text": "Brazilian entity"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-001",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.488,
+    "text": "carrier portal"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-002",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.451,
+    "text": "plant"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-003",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.558,
+    "text": "Vendor master"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-005",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.882,
+    "text": "Customer"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-006",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.946,
+    "text": "Intercompany"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-007",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.662,
+    "text": "Plant"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-010",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.671,
+    "text": "vendor master"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-011",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.831,
+    "text": "Australian ship-to failing address validation"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-015",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.525,
+    "text": "Dutch entity"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-016",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.76,
+    "text": "Australian supplier"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-020",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.94,
+    "text": "service desk"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-023",
+    "engine": "gliner",
+    "type": "ADDRESS",
+    "score": 0.915,
+    "text": "Hamilton DC"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-031",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.969,
+    "text": "buyer"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-034",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.949,
+    "text": "Customer"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-035",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.951,
+    "text": "service desk"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-036",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.969,
+    "text": "warehouse team"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-046",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.452,
+    "text": "Background job"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-049",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.838,
+    "text": "new customer"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-053",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.994,
+    "text": "Buyer"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-055",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.946,
+    "text": "German plant"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-056",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.983,
+    "text": "Warehouse supervisor"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-059",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.456,
+    "text": "buyer"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-064",
+    "engine": "gliner",
+    "type": "ADDRESS",
+    "score": 0.656,
+    "text": "storage location 0001"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-064",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.849,
+    "text": "plant 4000"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-001",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.897,
+    "text": "CFO office"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-002",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.702,
+    "text": "dispatch"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-004",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.979,
+    "text": "Hanoi shared service centre"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-006",
+    "engine": "gliner",
+    "type": "USER_ID",
+    "score": 0.472,
+    "text": "INC0044321"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-009",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.782,
+    "text": "warehouse office"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-012",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.794,
+    "text": "service desk"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-013",
+    "engine": "gliner",
+    "type": "ADDRESS",
+    "score": 0.875,
+    "text": "registered address"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-019",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.604,
+    "text": "receiving bank"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-020",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.785,
+    "text": "site office"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-020",
+    "engine": "gliner",
+    "type": "PHONE",
+    "score": 0.442,
+    "text": "8 and 4"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-022",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.878,
+    "text": "Customer"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-023",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.892,
+    "text": "site manager"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-025",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.867,
+    "text": "EU"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-026",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.989,
+    "text": "Sydney DC"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-028",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.748,
+    "text": "STO"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-030",
+    "engine": "gliner",
+    "type": "USER_ID",
+    "score": 0.548,
+    "text": "Lock"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-033",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.464,
+    "text": "plant 4100"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-040",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.892,
+    "text": "VF04 collective run"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-040",
+    "engine": "gliner",
+    "type": "ADDRESS",
+    "score": 0.508,
+    "text": "header level"
+   }
+  ],
+  "redacting_spans": 313
+ },
+ "live": {
+  "by_engine": {
+   "gliner": {
+    "on_value": 256,
+    "over": 57
+   }
+  },
+  "over": [
+   {
+    "corpus": "samples.json",
+    "id": "TKT-0009",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.806,
+    "text": "customer"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-006",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.592,
+    "text": "ATP"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-006",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.678,
+    "text": "Wellington office"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-009",
+    "engine": "gliner",
+    "type": "IBAN",
+    "score": 0.415,
+    "text": "account number"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-011",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.924,
+    "text": "Auckland shared services team"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-015",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.842,
+    "text": "plant"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-015",
+    "engine": "gliner",
+    "type": "CUSTOMER_NO",
+    "score": 0.53,
+    "text": "4000"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-015",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.493,
+    "text": "customer"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-018",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.967,
+    "text": "warehouse team"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-024",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.655,
+    "text": "company"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-029",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.814,
+    "text": "FSD ZCO_ALLOC_CYCLE"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-031",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.985,
+    "text": "Warehouse"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-033",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.799,
+    "text": "warehouse office"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-034",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.486,
+    "text": "Brazilian entity"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-001",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.488,
+    "text": "carrier portal"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-002",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.451,
+    "text": "plant"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-003",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.558,
+    "text": "Vendor master"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-005",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.882,
+    "text": "Customer"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-006",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.946,
+    "text": "Intercompany"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-007",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.662,
+    "text": "Plant"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-010",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.671,
+    "text": "vendor master"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-011",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.831,
+    "text": "Australian ship-to failing address validation"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-015",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.525,
+    "text": "Dutch entity"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-016",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.76,
+    "text": "Australian supplier"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-020",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.94,
+    "text": "service desk"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-023",
+    "engine": "gliner",
+    "type": "ADDRESS",
+    "score": 0.915,
+    "text": "Hamilton DC"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-031",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.969,
+    "text": "buyer"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-034",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.949,
+    "text": "Customer"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-035",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.951,
+    "text": "service desk"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-036",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.969,
+    "text": "warehouse team"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-046",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.452,
+    "text": "Background job"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-049",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.838,
+    "text": "new customer"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-053",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.994,
+    "text": "Buyer"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-055",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.946,
+    "text": "German plant"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-056",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.983,
+    "text": "Warehouse supervisor"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-059",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.456,
+    "text": "buyer"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-064",
+    "engine": "gliner",
+    "type": "ADDRESS",
+    "score": 0.656,
+    "text": "storage location 0001"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-064",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.849,
+    "text": "plant 4000"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-001",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.897,
+    "text": "CFO office"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-002",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.702,
+    "text": "dispatch"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-004",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.979,
+    "text": "Hanoi shared service centre"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-006",
+    "engine": "gliner",
+    "type": "USER_ID",
+    "score": 0.472,
+    "text": "INC0044321"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-009",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.782,
+    "text": "warehouse office"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-012",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.794,
+    "text": "service desk"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-013",
+    "engine": "gliner",
+    "type": "ADDRESS",
+    "score": 0.875,
+    "text": "registered address"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-019",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.604,
+    "text": "receiving bank"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-020",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.785,
+    "text": "site office"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-020",
+    "engine": "gliner",
+    "type": "PHONE",
+    "score": 0.442,
+    "text": "8 and 4"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-022",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.878,
+    "text": "Customer"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-023",
+    "engine": "gliner",
+    "type": "PERSON",
+    "score": 0.892,
+    "text": "site manager"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-025",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.867,
+    "text": "EU"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-026",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.989,
+    "text": "Sydney DC"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-028",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.748,
+    "text": "STO"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-030",
+    "engine": "gliner",
+    "type": "USER_ID",
+    "score": 0.548,
+    "text": "Lock"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-033",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.464,
+    "text": "plant 4100"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-040",
+    "engine": "gliner",
+    "type": "ORG_NAME",
+    "score": 0.892,
+    "text": "VF04 collective run"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-040",
+    "engine": "gliner",
+    "type": "ADDRESS",
+    "score": 0.508,
+    "text": "header level"
+   }
+  ],
+  "redacting_spans": 313
+ }
+}

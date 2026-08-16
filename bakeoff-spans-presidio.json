@@ -1,0 +1,520 @@
+{
+ "batch": {
+  "by_engine": {
+   "presidio": {
+    "on_value": 266,
+    "over": 31
+   }
+  },
+  "over": [
+   {
+    "corpus": "samples.json",
+    "id": "TKT-0002",
+    "engine": "presidio",
+    "type": "ADDRESS",
+    "score": 0.85,
+    "text": "PO"
+   },
+   {
+    "corpus": "samples.json",
+    "id": "TKT-0003",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "Invoice IDoc"
+   },
+   {
+    "corpus": "samples.json",
+    "id": "TKT-0003",
+    "engine": "presidio",
+    "type": "PERSON",
+    "score": 0.85,
+    "text": "Bill"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-002",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "Incident"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-006",
+    "engine": "presidio",
+    "type": "ADDRESS",
+    "score": 0.85,
+    "text": "Wellington"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-011",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "Auckland"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-012",
+    "engine": "presidio",
+    "type": "PERSON",
+    "score": 0.85,
+    "text": "Restart"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-014",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "EU"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-021",
+    "engine": "presidio",
+    "type": "PERSON",
+    "score": 0.85,
+    "text": "config knowledge"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-028",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "FSD ZMM_VENDOR_PORTAL"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-031",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "the Christchurch DC"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-034",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "Brazilian"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-035",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "QMEL"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-038",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "OSNO"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-011",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "Australian"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-014",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "European"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-015",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "Dutch"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-016",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "Australian"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-021",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "Target"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-055",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "German"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-003",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "Danish"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-003",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "VAT"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-003",
+    "engine": "presidio",
+    "type": "ADDRESS",
+    "score": 0.85,
+    "text": "Norway"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-004",
+    "engine": "presidio",
+    "type": "ADDRESS",
+    "score": 0.85,
+    "text": "Hanoi"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-006",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "INC0044321"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-025",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "EU"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-026",
+    "engine": "presidio",
+    "type": "ADDRESS",
+    "score": 0.85,
+    "text": "Sydney DC"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-027",
+    "engine": "presidio",
+    "type": "ADDRESS",
+    "score": 0.85,
+    "text": "UK"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-028",
+    "engine": "presidio",
+    "type": "ADDRESS",
+    "score": 0.85,
+    "text": "Melbourne"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-028",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "STO"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-034",
+    "engine": "presidio",
+    "type": "CUSTOMER_NO",
+    "score": 1.0,
+    "text": "400000"
+   }
+  ],
+  "redacting_spans": 297
+ },
+ "live": {
+  "by_engine": {
+   "presidio": {
+    "on_value": 266,
+    "over": 31
+   }
+  },
+  "over": [
+   {
+    "corpus": "samples.json",
+    "id": "TKT-0002",
+    "engine": "presidio",
+    "type": "ADDRESS",
+    "score": 0.85,
+    "text": "PO"
+   },
+   {
+    "corpus": "samples.json",
+    "id": "TKT-0003",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "Invoice IDoc"
+   },
+   {
+    "corpus": "samples.json",
+    "id": "TKT-0003",
+    "engine": "presidio",
+    "type": "PERSON",
+    "score": 0.85,
+    "text": "Bill"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-002",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "Incident"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-006",
+    "engine": "presidio",
+    "type": "ADDRESS",
+    "score": 0.85,
+    "text": "Wellington"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-011",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "Auckland"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-012",
+    "engine": "presidio",
+    "type": "PERSON",
+    "score": 0.85,
+    "text": "Restart"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-014",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "EU"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-021",
+    "engine": "presidio",
+    "type": "PERSON",
+    "score": 0.85,
+    "text": "config knowledge"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-028",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "FSD ZMM_VENDOR_PORTAL"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-031",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "the Christchurch DC"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-034",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "Brazilian"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-035",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "QMEL"
+   },
+   {
+    "corpus": "holdout_samples.json",
+    "id": "HO-038",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "OSNO"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-011",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "Australian"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-014",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "European"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-015",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "Dutch"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-016",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "Australian"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-021",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "Target"
+   },
+   {
+    "corpus": "eval_samples_v2.json",
+    "id": "V2-055",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "German"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-003",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "Danish"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-003",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "VAT"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-003",
+    "engine": "presidio",
+    "type": "ADDRESS",
+    "score": 0.85,
+    "text": "Norway"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-004",
+    "engine": "presidio",
+    "type": "ADDRESS",
+    "score": 0.85,
+    "text": "Hanoi"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-006",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "INC0044321"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-025",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "EU"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-026",
+    "engine": "presidio",
+    "type": "ADDRESS",
+    "score": 0.85,
+    "text": "Sydney DC"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-027",
+    "engine": "presidio",
+    "type": "ADDRESS",
+    "score": 0.85,
+    "text": "UK"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-028",
+    "engine": "presidio",
+    "type": "ADDRESS",
+    "score": 0.85,
+    "text": "Melbourne"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-028",
+    "engine": "presidio",
+    "type": "ORG_NAME",
+    "score": 0.85,
+    "text": "STO"
+   },
+   {
+    "corpus": "holdout_v3.json",
+    "id": "V3-034",
+    "engine": "presidio",
+    "type": "CUSTOMER_NO",
+    "score": 1.0,
+    "text": "400000"
+   }
+  ],
+  "redacting_spans": 297
+ }
+}

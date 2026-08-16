@@ -265,3 +265,97 @@ prefetch to download at all; the runtime value is set afterwards, where the
 last `ENV` wins. This is the same reasoning that already placed `BUILD_VERSION`
 after every `COPY`, and it is why the plan says "place them after the prefetch
 layer" (§7, Task 1, item 3).
+
+---
+
+## Tasks 3–5 — the three arms — ✅ COMPLETE 2026-08-16
+
+**One image, three runs, `pii-scrubber:gliner-cand@sha256:d96edef4…c764912`,
+`git_sha 67fc888` read back on every arm.** Threshold frozen at the image
+default `GLINER_THRESHOLD=0.4` throughout (Q5).
+
+### Detection
+
+| | `presidio` | `gliner` | `both` |
+|---|---|---|---|
+| Selftest | `100.0 / 45-45 / 0 / od 4 / 49` | `93.3 / 42-45 / 3 / od 1 / 43` | `100.0 / 45-45 / 0 / od 4 / 49` |
+| `holdout_samples` | 97.3% | 93.7% | **100.0%** |
+| `eval_samples_v2` | 95.6% | 92.6% | **100.0%** |
+| `holdout_v3` | 90.0% | **92.0%** | **100.0%** |
+
+⛔ **THE 100% IS NOT A RESULT. IT IS THE PREDICTED SHAPE OF A BURNED SET.**
+Presidio's residual on these three corpora is PERSON-dominant; GLiNER's leak
+lists contain **zero PERSON**. A union of two engines whose failures barely
+intersect closes sets whose failures were already enumerated. **These sets
+taught us about exactly these values.** Nothing here may be quoted, and the
+only instrument that could produce a quotable figure is blind batch v4.
+
+### The failure sets are nearly disjoint — the actual finding
+
+| Engine | What it leaks |
+|---|---|
+| `presidio` | PERSON (`ZHANG` `Young` `Mere Tuhoe` `Okonkwo` `FONTAINE` `NAKAMURA` `Park` `Adeyemi`), one bare ADDRESS, two CUSTOMER_NO |
+| `gliner` | IBAN ×3, IP_ADDRESS ×3, phone extensions (`x2244` `x3319`), service accounts (`svc_payprop_prd` `svc_monitor_01`), EMAIL ×2, CUSTOMER_NO ×2 |
+
+**Zero overlap.** GLiNER reads names and misses structured SAP/technical
+values; the deterministic recognizers do the opposite. That is a complementarity
+result, and it is the only part of the detection table that is not an artefact
+of burned corpora.
+
+### Over-redaction, per engine and per path
+
+| Arm | Redacting spans | Over-detections | Rate |
+|---|---|---|---|
+| `presidio` | 297 | 31 | **10.4%** |
+| `gliner` | 313 | 57 | **18.2%** |
+| `both` | 351 | 76 (gliner 55 · presidio 21) | **21.7%** |
+
+Dominated by `ORG_NAME` in every arm (presidio 20, gliner 34–35).
+
+⚠️ **Batch vs live span attribution is IDENTICAL in all three arms** — measured,
+not assumed. Detection is mode-independent; **the magnitude is the same and only
+the COST differs**: on batch an extra redaction damages readable KB text, on
+live the caller re-maps inside the boundary and it costs nothing. So
+over-redaction is a **batch-path** argument only.
+
+⚠️ **In union mode the per-engine split counts MERGE WINNERS, not detections.**
+presidio's on-value count falls 266 → 88 between its own arm and the union,
+because GLiNER spans are usually longer and win the overlap. Both engines still
+detect the value; only one span survives `_merge`. Reading that 88 as "presidio
+found less" would be wrong.
+
+### Pod fitness — `--cpus=1 --memory=3g`, thread cap from the IMAGE
+
+| Gate | `presidio` | `gliner` | `both` |
+|---|---|---|---|
+| Cold load | 3.1 s | 8.9 s | 9.7 s |
+| p50, median sample | **6 ms** | 688 ms | **702 ms** |
+| Longest document | 14 ms | 1,043 ms | 1,054 ms (max 1,332) |
+| 65-sample batch | **0.5 s** | 48.0 s | **48.9 s** |
+| 4-way concurrency | 1.07× | 0.51× | 0.51× (max 6,200 ms) |
+| Peak RSS, stressed | 456 MiB (14.8%) | 2.098 GiB (69.9%) | **2.175 GiB (72.5%)** |
+| OOM at 3 GB | no | no | **no** |
+
+Compressed image, the only trusted method (`docker save | gzip | wc -c`):
+**1,509,635,404 bytes = 1.51 GB.**
+
+⛔ **Every latency figure above is an EMULATED amd64-on-ARM UPPER BOUND.** The
+pod figure is unmeasured and unmeasurable here; per the Rule 7 decision the
+live gate is answered at a release's verification step, with the fallback
+pre-stated. **Do not quote 702 ms as the pod's latency.**
+
+**Union costs ~2% over GLiNER alone** (702 ms vs 688 ms; 48.9 s vs 48.0 s;
+2.175 vs 2.098 GiB). Presidio is essentially free once GLiNER is in the
+process — so `gliner` alone is **dominated**: worse recall, leaks presidio
+catches, and no latency saving. **If GLiNER ships at all, it ships as `both`.**
+
+### Stop conditions — none fired
+
+| | Condition | Result |
+|---|---|---|
+| S1 | engine / `gliner_loaded` read back per arm | ✅ all three correct, `last_load_error` null |
+| S2 | union exposes something presidio redacted | ✅ union leaks **nothing** at all |
+| S3 | over-detection of a type the engine has no label for | ✅ every GLiNER over-type is in `GLINER_LABELS` |
+| S4 | threshold other than the frozen one | ✅ `0.4` image default, unchanged across arms |
+| S5 | RSS > 3 GB or non-zero exit | ✅ max 2.175 GiB, all arms exit clean |
+| S6 | corpora line differs between arms | ✅ `samples: 158`, same four files, all arms |
