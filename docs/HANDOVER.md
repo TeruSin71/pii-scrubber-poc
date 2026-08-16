@@ -128,22 +128,25 @@ the live path.**
 ### Queued, in order
 
 1. ✅ ~~Rule 7 decision~~ — **MADE 2026-08-16**, recorded above. Backend torch.
-2. **← YOU ARE HERE. Bake-off plan for Gate 0 review**, written against the
-   **frozen** torch candidate. Must pre-register: three modes (presidio /
-   gliner / union), threshold policy **never tuned on burned sets**,
-   **per-engine AND per-path** over-redaction metrics, pod-fitness gates
-   (compressed size, memory, `--cpus=1` latency, **plus margin**), corpus
-   rules — burned sets are engineering comparison and regression **only**; a
-   quotable number requires a fresh blind batch. Plus this round's three
-   additions: tokenizer resolution recorded, `--cpus=1` latency gate, stressed
-   memory gate. ⚠️ **Nothing builds and nothing touches the deployment until
-   this plan is reviewed.**
-3. **Mechanism-claims audit** (executor) — authorized, its own scoped session.
+2. ✅ ~~Bake-off plan for Gate 0 review~~ — **WRITTEN and ANSWERED
+   2026-08-16.** `docs/superpowers/plans/2026-08-16-pii-scrubber-gliner-bakeoff.md`,
+   revision 1. Gate 0 rulings and Q1–Q8 are verbatim in its §12; the standing
+   rules they produced are in "Settled" above.
+3. **← YOU ARE HERE. Execute the bake-off**, in the authorized order:
+   Task 0 (pre-fix baseline + per-file provenance hash) → **Task 1, MANDATORY**
+   (`_merge` monotonicity fix + git sha + both offline vars + thread cap at
+   both layers, **ONE** build, re-freeze, tokenizer re-proof) → Tasks 2–6 →
+   **Task 7 review gate**.
+   ⚠️ **The freeze is lifted for exactly one rebuild.** The candidate that gets
+   measured is Task 1's output, not today's `pii-scrubber:gliner-cand`.
+   ⚠️ **No deployment touch, nothing pushed beyond the three authorized
+   commits, blind batch v4 untouched.**
+4. **Mechanism-claims audit** (executor) — authorized, its own scoped session.
    Ledger every claim of mechanism here as *exercised / observed / asserted,
    never executed*, then scratch-container probes for the third bucket. Both
    of this project's recent errors came from that bucket.
-4. **Blind batch v4** (reviewer) — reframed: it **sizes an open leak**, it does
-   not verify a fix.
+5. **Blind batch v4** (reviewer) — reframed: it **sizes an open leak**, it does
+   not verify a fix. ⛔ **And it is never a tuning corpus** — see "Settled".
 
 ⚠️ **Not queued, deliberately:** more review rounds. 1.2.2 and 1.2.3 changed
 zero detection between them and the blind figure has not moved since the
@@ -822,6 +825,53 @@ was caught but typed `ORG_NAME` — redacted, mistyped, log only.
   template to one build; the tag lets a corrected image flow through with no
   template change. This was load-bearing when the arm64 image had to be
   replaced (finding 13).
+
+### 📌 Established at the bake-off Gate 0 — 2026-08-16
+
+Five standing rules, each from a ruling recorded **verbatim** in
+`docs/superpowers/plans/2026-08-16-pii-scrubber-gliner-bakeoff.md` §12.
+**Reviewer session (Claude Cowork), relayed by Teru, 2026-08-16.**
+
+- ⛔ **A correction commit carries a grep transcript proving ZERO remaining
+  instances repo-wide.** Verbatim: *"New standing rule: correction commits
+  carry a grep transcript proving zero remaining instances repo-wide."* This
+  project has now recorded **three** occurrences of one correction applied in
+  two of three places — `README-DEPLOY.html` §7 vs the `Dockerfile` copy, the
+  1.2.3 trap-8 text across three files, and the `Dockerfile` finding-11 block
+  that was still false a day after `requirements.txt` was fixed. Each was found
+  by accident. **A claim corrected in one file is a document disagreeing with
+  itself**, and the only reliable proof of completeness is the search itself,
+  attached to the commit that claims it.
+- ⛔ **The tested artifact must equal the deployed artifact under default
+  invocation.** Verbatim: *"Offline env + thread caps: baked into the image
+  ENV. Tested artifact = deployed artifact under default invocation."* If a
+  measurement depends on a condition (`HF_HUB_OFFLINE=1`, a thread cap), that
+  condition belongs to the **artifact**, not to the command someone remembered
+  to type. A condition supplied by the invocation makes every number true of a
+  machine that only exists on the tester's laptop.
+- ⛔ **A blind set is NEVER a tuning corpus.** Verbatim: *"v4 is never a tuning
+  corpus — fix the wording."* Tuning against a blind set destroys it in the
+  same act that burned the other four, and it is the only unburned instrument
+  this project has. Legitimate tuning needs a **separate, purpose-built,
+  openly-readable** corpus — the `address_verify_samples.json` pattern. The
+  burned-set rule and this rule are **not** the same rule, and an earlier draft
+  conflated them by saying tuning "waits for v4".
+- ⛔ **When configurations differ, claims are CONFIGURATION-level, never
+  ENGINE-level.** Verbatim: *"bake-off claims are configuration-level, never
+  engine-level."* Presidio spans pass per-type floors; GLiNER spans pass one
+  global floor and never touch `TYPE_THRESHOLDS`. Any delta between them
+  contains both effects, so "GLiNER is more accurate" is unsupportable by
+  construction. **The confound is named beside every number, not once in a
+  caveats section** — a caveat one scroll away from a figure does not travel
+  with it.
+- ⛔ **A defect found while planning is FIXED before measurement, never
+  measured around.** Verbatim: *"Union merge: DEFECT. Fix before measurement."*
+  The plan had proposed detecting it with a stop condition; that was wrong.
+  Measuring a path that can silently lose coverage produces numbers describing
+  a bug, and every downstream comparison inherits it. The corollary the ruling
+  forces: because the fix touches shared code, **any movement it causes in an
+  already-shipped path is a latent-defect stop** — the fix revealing an
+  existing defect — and never "we changed the code, so of course it moved".
 
 ---
 
