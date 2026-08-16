@@ -395,6 +395,54 @@ and **hard-fails if it is not actually offline**. Verified: passes offline,
 fails loudly online. Together with the `transformers==4.57.6` pin, that is
 what holds the finding in place.
 
+### 📊 GLiNER pod-fitness gates — measured 2026-08-16 on the POD shape
+
+`--cpus=1 --memory=3g`, `OMP_NUM_THREADS=1`, image `pii-scrubber:gliner-cand`,
+against all 158 real corpus samples. **This is the Starter plan's actual
+shape**; every earlier latency figure was taken on many cores and is void.
+
+| Gate | presidio | **presidio + GLiNER** |
+|---|---|---|
+| Cold load (first call) | 3.6 s | 12.7 s |
+| p50 latency, median sample (118 ch) | **6 ms** | **678 ms** |
+| Longest document (307 ch) | 13 ms | 1,038 ms (max 1,309) |
+| Gate-sized batch, 65 samples | 0.5 s | **47.6 s** (mean 733 ms) |
+| 4-way concurrency | 1.13× | **0.48× — contention**, max **6,465 ms** |
+| Peak RSS | 456 MiB (14.8%) | **2.18 GiB (72.6%)** |
+| OOM at 3 GB? | no | **no** — alive, exit 0 |
+
+**GLiNER is ~113× slower per request than presidio on one vCPU.**
+
+⚠️ **Both bounds are known and the true pod figure is neither.** 678 ms is
+emulated amd64-on-ARM, so it is an **upper** bound; 44 ms was native but on
+many cores, so it is a **lower** bound. **Nobody has measured native amd64 on
+one vCPU, and that is the only number that decides the live path.** Do not
+quote either figure as the pod's latency.
+
+**Memory is the good news and it is now stressed, not assumed:** 2.18 GiB peak
+*after* a 65-sample batch and a concurrency probe, 823 MiB headroom, no OOM.
+The 3 GB ceiling is not the blocker. Latency is.
+
+**Image size after the `chmod` layer fix:** compressed **2.46 GB → 1.51 GB**,
+−950 MB (39%). `docker image inspect .Size` disagreed with itself across the
+two builds (6.76 GB vs 1.51 GB); **only `docker save | gzip | wc -c` is
+trusted here.**
+
+### ⛔ ONNX is blocked in `gliner==0.2.16` — Rule 7 decision needed
+
+The size-and-latency lever cannot be pulled at the current pin:
+
+- `GLiNER.from_pretrained` has **no ONNX parameter**; the source does not
+  mention onnx at all. `gliner.onnx.model` exists but is not wired into the
+  loading API in this version.
+- `onnxruntime 1.28.0` **is** already installed (no new dep there), but
+  `optimum` — the export tooling — is **not**.
+
+So ONNX needs either a **gliner upgrade** (which re-opens the entire
+finding-11 pin chain: gliner's unbounded `huggingface_hub>=0.21.4` is what
+broke it, and the fix is a coupled hub+transformers pin) or **`optimum` as a
+new dependency**. Both are Rule 7. **Not taken unilaterally.**
+
 ### 🔬 Phase 0 of the recognizer plan — mechanism-selection spike, REQUIRED
 
 Directed at review, 2026-08-16. **Before any pre-registration is written**,

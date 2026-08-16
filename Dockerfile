@@ -47,16 +47,28 @@ m = GLiNER.from_pretrained(os.environ['GLINER_MODEL']); \
 print('GLiNER weights baked in OK:', type(m).__name__)"; \
     else \
       echo "GLiNER not installed -- slim presidio-only build, prefetch skipped BY DESIGN"; \
-    fi
+    fi \
+ && chmod -R 777 /app/hfcache
+# ^ chmod IN THIS LAYER, deliberately. KServe may run as a non-root UID and
+# huggingface_hub writes lock files into the cache even when offline, so the
+# tree must stay writable. Doing it here costs nothing; doing it in a LATER
+# layer re-wrote every file's mode and made overlayfs duplicate the whole
+# 1.1 GB of weights into a second layer.
 
 # allowlist.txt MUST ship in the image -- without it ALLOWLIST_PATH resolves
 # to a missing file and the service silently falls back to the 27-token seed,
 # so extracted TSTC/DD02L tokens exist locally but not in production.
 # (Defect found by the VS Code plan review, 2026-08-15.)
-COPY app.py recognizers.py samples.json allowlist.txt glossary.txt ./
-
 # AI Core / KServe may run the container as a non-root UID.
-RUN chmod -R 777 /app
+#
+# ⚠️ --chmod ON THE COPY, NOT A `RUN chmod -R 777 /app` AFTERWARDS.
+# The old form ran after the GLiNER prefetch and rewrote every file's mode
+# under /app, so overlayfs copied the whole directory into a new layer --
+# storing the 1.1 GB of model weights TWICE. Measured in `docker history`:
+# a 1.16 GB prefetch layer followed by a 1.16 GB chmod layer, byte-for-byte
+# duplicate. Applying the mode at COPY time touches only the copied files and
+# leaves the weights in one layer.
+COPY --chmod=777 app.py recognizers.py samples.json allowlist.txt glossary.txt ./
 
 # Presidio-only. This is not a starting point -- it is the only mode that runs.
 #
