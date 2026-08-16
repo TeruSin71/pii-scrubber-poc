@@ -5,6 +5,57 @@ prior context.
 
 ---
 
+## 🏁 PROJECT COMPLETE — 2026-08-16. Read this before anything below.
+
+**Decision by Teru: 90% is acceptable. The POC is finished.** It answered the
+question it was built to answer. Everything below this banner is the record of
+how, and stays accurate — but no further engineering is scoped.
+
+**What was delivered**
+
+| | |
+|---|---|
+| Service | Presidio + 9 custom SAP recognizers, running in the compliance boundary. No third-party model ever sees raw data |
+| Deployed | `pii-scrubber:1.2.3` on SAP AI Core BYOM, deployment `daedcfe9342d21a7`, verified end to end |
+| **Quotable figure** | **90.0% blind** (`holdout_v3`, 40 samples / 50 values, authored externally, run once, zero novel failure classes) |
+| Benchmark | 97.3% — **burned, regression-only, never quotable** |
+| For management | `holdout-evaluation-report.html`, `scrubber-options-for-management.html` — ready, local-only, gitignored |
+
+**What was deliberately NOT done — cancelled, not forgotten**
+
+| Dropped | Why |
+|---|---|
+| Mechanism-claims audit | Authorized, never started. Inward-facing; it improves confidence in the *record*, not the scrubber. Pointless once no further releases ship |
+| Blind batch v4 | Its only purpose was a **new** number. 90% is accepted, so a new number changes no decision |
+| Recognizer plan (`FAC`) | Would close the unnumbered-street class. Real, measured, **and left open** — see below |
+| GLiNER | Blocked on a `huggingface_hub` pin (finding 11). The one unblocked-if-approved path to better recall, and not taken |
+
+⚠️ **The known residual, stated plainly so nobody inherits it by surprise:**
+roughly one in ten planted values survives, **almost all of them person
+names** — the leak is per-token, not per-frame (`VERMEULEN` is caught in the
+identical sentence `NAKAMURA` leaks from). Rules were measured to reach about
+a third of it; a larger model measured net-zero. Separately, **unnumbered
+street and facility references redact nothing at all** ("the warehouse on
+Willis Street"), which is a real open gap at the recognizer layer, not the
+`LABEL_MAP` layer.
+
+**On the batch path this is tolerable** — a human gate sees the output.
+**On the live path there is no human gate, so ~90% is final**, and that was
+the trade accepted.
+
+### ✅ Completion checklist — the rotation trigger has FIRED
+
+Rotation was deferred to "project completion". **That event is now.** Owner:
+Teru. This is the recorded trigger firing, not a re-raised finding.
+
+- [ ] **Rotate the AI Core service key** (`~/aicore-key.json`) — transited chat 2026-08-15
+- [ ] **Rotate the GitHub PAT** — transited chat 2026-08-15; also used for the 1.2.3 image push
+- [ ] Delete the two stale "PII Scrubber" configurations (7:19 PM / 7:33 PM) in AI Launchpad
+- [ ] Decide the fate of deployment `daedcfe9342d21a7` — **leaving it running holds the free tier's single pod and keeps a live endpoint reachable with the pre-rotation registry secret.** Delete it, or re-create it after rotation
+- [ ] Send the two HTML reports to management
+
+---
+
 ## What this is
 
 A **PII scrubber for an SAP incident knowledge base**. It redacts personal data
