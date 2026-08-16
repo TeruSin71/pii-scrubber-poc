@@ -139,7 +139,107 @@ expensive layers stay cached — see the note in Task 1 below.
 
 ---
 
-## Task 1 — MANDATORY fix + rebuild — 🔜 NOT STARTED
+## Task 1 — MANDATORY fix + rebuild — ✅ COMPLETE 2026-08-16
+
+### 1.1 `_merge` monotonicity — RED, remedy B, GREEN
+
+**RED against unmodified `_merge`** — 3 failures, all coverage-loss:
+
+```
+registered case P=[10,20] + G=[5,18]   lost [18, 19]
+chain (added span straddles two)       lost [0..4, 25..29]
+property test, 3000 geometries         548 VIOLATIONS
+```
+
+⚠️ **The defect was a CLASS, not the one example.** 548 of 3000 random
+geometries lost characters, and it was **live in presidio-only mode** — two
+overlapping presidio spans are enough, no second engine required.
+
+**Remedy B** (approved at Gate 0): coalesce a remainder into a **contiguous,
+same-type** kept span. No gap bridging — coalescing can never redact a
+character no span claimed. Cross-type remainders stay separate fragments.
+
+**GREEN, all checks:** registered case · 8 edge geometries · 4 new coalesce
+geometries (LEFT / RIGHT / BETWEEN / cross-type-stays-separate) · no-gap-
+bridging · coalescing-invents-nothing · 3000 property trials · non-vacuity
+(pre-fix still violates 548/3000) · no new cross-engine score reliance.
+
+**Byte-identity, re-pinned in the same commit: 157 of 158 identical.**
+
+```
+HO-012   pre-fix : (93, 110, 'ORG_NAME', 'Fields & Sons Pty')   <- period LOST
+         post-fix: (93, 111, 'ORG_NAME', 'Fields & Sons Pty.')  <- ONE span
+         output '<ORG_NAME>.'  ->  '<ORG_NAME>'
+```
+
+The character shipped code was losing is a **period**. Recorded as assertions,
+not prose, so a second delta anywhere is a STOP and a silent change to this one
+cannot pass. **Remedy B removed the artifact** the first fix produced
+(`<ORG_NAME><ORG_NAME>`, two tokens for one value).
+
+⚠️ **A harness bug was found and fixed rather than worked around:** the
+regression capture stored `text[:70]`, truncating away the very value the
+marker assertion then looked for at offset 93 — a correct fix reported as a
+failure because the harness discarded the evidence before asserting on it.
+
+### 1.2 Artifact conditions — all four in ONE build
+
+| | Change | Placement |
+|---|---|---|
+| sha | `GIT_SHA` build arg, surfaced on `/v1/info` | end, beside `BUILD_VERSION` |
+| offline | `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1` | ⚠️ **after** the prefetch, never by editing the early block |
+| threads | `OMP_NUM_THREADS=1`, `MKL_NUM_THREADS=1` | image **and** `ServingTemplate` |
+
+Build: **3 min 02 s**, `linux/amd64`. Weight prefetch re-ran and reported
+`GLiNER weights baked in OK` — the step that can now fail the build did not.
+
+```
+re-frozen  pii-scrubber:gliner-cand@sha256:d96edef4fc012217683d219f5f212fe4b420ccc2de5fd440d841ffb32c764912
+pre-fix    pii-scrubber:gliner-cand-prefix-2026-08-16@sha256:2fa85d674b3ab76bc7f424ddbb00e376e272c29b5f02887b0be04ba583fbdebd
+```
+
+`/v1/info`: `build_version: gliner-cand-b`, **`git_sha: 67fc888`** — matches
+`git rev-parse --short HEAD`. Provenance is now a stamped read.
+
+Container env with **no `-e` flags passed**: `HF_HUB_OFFLINE=1`,
+`TRANSFORMERS_OFFLINE=1`, `OMP_NUM_THREADS=1`, `MKL_NUM_THREADS=1`.
+
+### 1.3 Tokenizer gate re-proved on the new image — BOTH directions
+
+| Direction | Invocation | Result |
+|---|---|---|
+| Offline | **default, no `-e` flag** | ✅ ALL TESTS PASS — 5 texts, 0 UNK, byte-perfect round trips, arbitration re-run |
+| Online | `-e HF_HUB_OFFLINE=0` | ✅ **FAILS LOUDLY**, 2 checks, naming the cause |
+
+⚠️ **The concern that baking offline in might make the guard untriggerable is
+resolved by measurement:** `-e HF_HUB_OFFLINE=0` still overrides the image
+default and the suite still fails, with the right diagnosis — *"this run is not
+really offline and is exercising a prebuilt tokenizer.json"*. A guard that
+cannot fail is not a guard, and this one still can.
+
+---
+
+## Task 2 — control arm on the re-frozen image — ✅ PASS 2026-08-16
+
+`SCRUBBER_ENGINE=presidio`, `/v1/info` read back first
+(`engine: presidio`, `gliner_loaded: false`, `git_sha: 67fc888`).
+
+| Measurement | Registered §5.1 | Measured |
+|---|---|---|
+| Selftest | `100.0 / 45/45 / 0 / 4 / 49` | **identical** ✅ |
+| `holdout_samples.json` | `108/111` | **97.3%** ✅ |
+| `eval_samples_v2.json` | `65/68` | **95.6%** ✅ |
+| `holdout_v3.json` | `45/50` | **90.0%** ✅ |
+
+**Leak lists identical to Task 0's pre-fix capture, line by line, all three.**
+
+**No latent-defect stop at corpus level.** The HO-012 delta is a period, which
+is not a scored value, so it changes no leak list and no gate — the unit-level
+regression is where it is visible, which is where it was registered.
+
+---
+
+## Task 1 — §9 precondition record
 
 **§9 precondition satisfied before anything else:**
 
