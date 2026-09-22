@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finish the PII Scrub POC — Step by Step</title>
+<style>
+:root{
+  --bg:#ffffff;--fg:#1f2328;--muted:#57606a;--line:#d7dde3;
+  --accent:#0a6ed1;--accentbg:#eaf3fc;--green:#1a7f37;--greenbg:#eefaf1;
+  --amber:#9a6700;--amberbg:#fff8e6;--red:#cf222e;--redbg:#fff1f0;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--fg);
+ font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+ -webkit-font-smoothing:antialiased;}
+.wrap{max-width:900px;margin:0 auto;padding:40px 24px 80px;}
+h1{font-size:25px;margin:0 0 4px;}
+.sub{color:var(--muted);margin:0 0 26px;}
+h2{font-size:19px;margin:34px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--line);}
+h2 .n{display:inline-block;background:var(--accent);color:#fff;border-radius:50%;
+ width:26px;height:26px;line-height:26px;text-align:center;font-size:14px;margin-right:9px;}
+h3{font-size:16px;margin:20px 0 6px;}
+p{margin:10px 0;}
+ol,ul{margin:8px 0;padding-left:24px;}
+li{margin:7px 0;}
+code{background:#f6f8fa;padding:1px 6px;border-radius:5px;font-size:13.5px;
+ font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;}
+pre{background:#f6f8fa;border:1px solid var(--line);border-radius:8px;padding:12px 14px;
+ overflow-x:auto;font-size:13.5px;line-height:1.6;
+ font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:14.5px;}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top;}
+th{background:#f6f8fa;font-weight:600;}
+td.k{font-weight:600;background:#fbfcfd;width:200px;}
+.note{background:var(--accentbg);border:1px solid #9ec2f0;border-radius:10px;padding:6px 18px;margin:14px 0;}
+.warn{background:var(--amberbg);border:1px solid #eacb6b;border-radius:10px;padding:6px 18px;margin:14px 0;}
+.warn strong{color:var(--amber);}
+.ok{background:var(--greenbg);border:1px solid #a8dcb8;border-radius:10px;padding:6px 18px;margin:14px 0;}
+.ok strong{color:var(--green);}
+.done{background:#f6f8fa;border:1px solid var(--line);border-radius:10px;padding:6px 18px;margin:14px 0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Finish the PII Scrub POC — step by step</h1>
+<p class="sub">Picks up exactly where we stopped. Everything below happens in <strong>SAP Build Process Automation</strong>, in the project <strong>PII Scrub and Review POC</strong>, process <strong>Scrub and Review Ticket</strong>. Roughly 30–45 minutes.</p>
+
+<div class="done">
+<p><strong>Already done — don't redo these.</strong> Destination <code>NER_SCRUBBER</code> (created, tested, flagged for Build). Action project <strong>PII Scrubber</strong> (released 1.0.0, published). Process created with trigger <strong>Upload Ticket</strong> → step <strong>Scrub PII from text</strong> → End, and the destination variable <code>NER_SCRUBBER_DEST</code> attached to the scrub step.</p>
+</div>
+
+<h2><span class="n">1</span>Add the text box to the Upload Ticket form</h2>
+<p>The trigger form exists but has no fields yet, so there's nothing to scrub.</p>
+<ol>
+  <li>Open the process <strong>Scrub and Review Ticket</strong> (Lobby → PII Scrub and Review POC → the process).</li>
+  <li>Click the <strong>Upload Ticket</strong> trigger box, then in the right-hand panel choose <strong>Open Form</strong> (or the <strong>…</strong> menu on the box → <em>Open Editor</em>). The form editor opens in a new tab.</li>
+  <li>From the left palette, drag a <strong>Text Area</strong> (multi-line) field onto the form canvas.</li>
+  <li>Select it and set, in the right-hand properties:
+    <ul>
+      <li><strong>Label:</strong> <code>Ticket text</code></li>
+      <li><strong>Name / Identifier:</strong> <code>ticketText</code> &nbsp;(exact spelling matters — you'll pick it by this name in step 2)</li>
+      <li><strong>Required:</strong> on</li>
+    </ul>
+  </li>
+  <li><em>Optional but handy:</em> drag a single-line <strong>Text</strong> field above it — Label <code>Ticket reference</code>, Name <code>ticketRef</code>. Purely for labelling the run.</li>
+  <li>Click <strong>Save</strong>, then close the form editor tab and go back to the process tab.</li>
+</ol>
+
+<h2><span class="n">2</span>Feed the form text into the scrubber</h2>
+<ol>
+  <li>Click the <strong>Scrub PII from text</strong> step.</li>
+  <li>In the right panel open the <strong>Inputs</strong> tab (it has a red dot — that's what we're clearing).</li>
+  <li><strong>text</strong> — click the field, and from the process-content picker choose <strong>Upload Ticket → Ticket text</strong>.</li>
+  <li><strong>mode</strong> — type the literal word <code>live</code>.
+    <div class="note"><p><code>live</code> is what makes the scrubber return numbered placeholders like <code>&lt;PERSON_1&gt;</code> plus the token map. <code>batch</code> would give you plain <code>&lt;PERSON&gt;</code> with no map.</p></div>
+  </li>
+  <li>Click <strong>Save</strong> (top right). The red dot and the Design Console warning should clear.</li>
+</ol>
+
+<h2><span class="n">3</span>Add the review-and-correct step</h2>
+<p>This is the part the whole POC exists to show.</p>
+<ol>
+  <li>On the canvas, click the <strong>+</strong> between <strong>Scrub PII from text</strong> and <strong>End</strong>.</li>
+  <li>Choose <strong>Approval</strong>.</li>
+  <li>Choose <strong>Blank Form</strong> and name it <code>Review Scrubbed Ticket</code>. The form editor opens.</li>
+  <li>Build the form with three fields, in this order:
+    <table>
+      <tr><th>Field type</th><th>Label</th><th>Name</th><th>Notes</th></tr>
+      <tr><td>Text (single line)</td><td>Ticket reference</td><td><code>refDisplay</code></td><td>Optional</td></tr>
+      <tr><td>Text Area</td><td>Original ticket (reference only)</td><td><code>originalText</code></td><td>Set <strong>read-only</strong> if the option exists</td></tr>
+      <tr><td>Text Area</td><td>Scrubbed text — correct it here</td><td><code>correctedText</code></td><td>Must stay <strong>editable</strong> — this is the correction box</td></tr>
+    </table>
+  </li>
+  <li>Make the two text areas tall (5–10 rows) so real ticket text is readable.</li>
+  <li><strong>Save</strong> the form, close its tab, return to the process.</li>
+  <li>Click the new <strong>Approval</strong> step → <strong>Inputs</strong> tab, and map:
+    <table>
+      <tr><td class="k">refDisplay</td><td>Upload Ticket → Ticket reference</td></tr>
+      <tr><td class="k">originalText</td><td>Upload Ticket → Ticket text</td></tr>
+      <tr><td class="k">correctedText</td><td><strong>Scrub PII from text → scrubbed_text</strong></td></tr>
+    </table>
+  </li>
+  <li>In the same panel set <strong>Recipients / Users</strong> to yourself (your email) so the task lands in your own inbox.</li>
+  <li><strong>Save</strong>.</li>
+</ol>
+<div class="warn">
+<p><strong>The one mapping that matters:</strong> <code>correctedText</code> must come from the scrub step's <code>scrubbed_text</code> output, not from the form. If you map it to the original ticket text you'll be reviewing unscrubbed data and the demo proves nothing.</p>
+</div>
+
+<h2><span class="n">4</span>Release and deploy</h2>
+<ol>
+  <li>Top right of the process editor: <strong>Release</strong> → version <code>1.0.0</code> → confirm.</li>
+  <li>Then <strong>Deploy</strong> (the button changes after release).</li>
+  <li>Deployment will ask you to give a value for the environment variable <code>NER_SCRUBBER_DEST</code>. Pick the destination <strong>NER_SCRUBBER</strong> from the list.
+    <div class="note"><p>This is the step that actually binds the process to the scrubber. It's a different mechanism from the Test tab that showed an empty list earlier, so don't be surprised if that one is still empty — it doesn't affect this.</p></div>
+  </li>
+  <li>Confirm and wait for "deployed successfully".</li>
+</ol>
+<div class="warn">
+<p><strong>If the destination isn't listed here either:</strong> stop and tell me. That would mean the destination genuinely isn't visible to BPA rather than just to the design-time tester, and it's a different fix.</p>
+</div>
+
+<h2><span class="n">5</span>Run it</h2>
+<ol>
+  <li>Find the start form: project <strong>Overview → Triggers</strong> tab, which lists the deployed form and its link. (Alternatively, Monitoring → <em>Manage</em> → the deployed process.)</li>
+  <li>Open the form link, paste the test ticket below into <strong>Ticket text</strong>, and submit.</li>
+  <li>Open <strong>My Inbox</strong> (the inbox icon, top right of SAP Build). Within a few seconds the task <em>Review Scrubbed Ticket</em> should appear.</li>
+  <li>Open it. You should see the scrubbed version with placeholders. <strong>Edit the box</strong> — restore anything wrongly hidden, hide anything missed — then <strong>Approve</strong>.</li>
+</ol>
+
+<h3>Test ticket to paste</h3>
+<pre>P1: Sales order 39349230 cannot be saved, short dump in VA01.
+Document number not available in database. Reported by Sarah Whitcombe
+from the Hamilton branch, contact 021 445 9922 or
+sarah.whitcombe@gallagher.co.nz. Check table LIKP for plant ELEC.
+Customer 0001045992 affected since this morning.</pre>
+
+<h3>What you should see</h3>
+<ul>
+  <li><strong>Redacted:</strong> the person's name, the phone number, the email address, the customer number — each as a numbered placeholder such as <code>&lt;PERSON_1&gt;</code>, <code>&lt;EMAIL_1&gt;</code>.</li>
+  <li><strong>Left alone:</strong> <code>VA01</code>, <code>LIKP</code>, and the sales order number <code>39349230</code> — transaction codes and table names are protected, and document numbers aren't treated as personal data.</li>
+  <li><strong>Possibly wrongly redacted:</strong> <code>plant ELEC</code> or <code>Hamilton branch</code>. If so — good. That's exactly the correction the reviewer step exists for, and restoring it is the behaviour you're demonstrating.</li>
+</ul>
+
+<h2>If something goes wrong</h2>
+<table>
+  <tr><td class="k">Scrub step fails at runtime</td><td>Most likely the OAuth credentials or token URL. In the cockpit, open <code>NER_SCRUBBER</code> and confirm Token Service URL matches the <code>url</code> value in <code>aicore-key.json</code> with <code>/oauth/token</code> on the end. Check the run log in <strong>Monitoring → Process and Workflow Instances</strong> for the actual error.</td></tr>
+  <tr><td class="k">401 / unauthorized</td><td>Client ID or secret mismatch. Re-paste both from the key file.</td></tr>
+  <tr><td class="k">404 from the scrubber</td><td>Destination URL wrong. It must end with <code>/v2/inference/deployments/daedcfe9342d21a7</code> and nothing after.</td></tr>
+  <tr><td class="k">Nothing gets redacted</td><td>Check the <code>mode</code> input is <code>live</code> and <code>text</code> is mapped to the form field, not left empty.</td></tr>
+  <tr><td class="k">No task in My Inbox</td><td>The Approval step's recipient isn't set to you. Edit, set Users to your email, re-release and re-deploy.</td></tr>
+</table>
+
+<div class="ok">
+<p><strong>When it works, you've demonstrated the whole thing:</strong> a ticket goes in, personal data comes out redacted by a local engine inside your boundary, a human sees exactly what was hidden and corrects it, and only the approved text moves on. The triage call is the one step still missing, and it needs nothing more than the MCP server's auth header name.</p>
+</div>
+
+</div>
+</body>
+</html>
