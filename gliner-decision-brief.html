@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PII Scrubber — GLiNER Decision Brief</title>
+<style>
+  :root{
+    --bg:#ffffff; --fg:#1f2328; --muted:#57606a; --line:#d0d7de;
+    --uni:#6f42c1; --unibg:#f5f0ff; --ner:#0969da; --nerbg:#eef4fd;
+    --shared:#1a7f37; --sharedbg:#eef8f0; --warn:#9a6700; --warnbg:#fff8e6;
+    --red:#cf222e; --redbg:#fff1f0;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--fg);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1040px; margin:0 auto; padding:44px 26px 80px;}
+  h1{font-size:27px; line-height:1.25; margin:0 0 4px;}
+  .sub{color:var(--muted); margin:0 0 8px;}
+  .badge{display:inline-block; font-size:12px; font-weight:700; letter-spacing:.03em;
+    color:var(--muted); border:1px solid var(--line); border-radius:20px; padding:3px 11px; margin:0 6px 24px 0;}
+  h2{font-size:20px; margin:38px 0 12px; padding-bottom:6px; border-bottom:2px solid var(--line);}
+  h3{font-size:17px; margin:22px 0 8px;}
+  p{margin:12px 0;}
+  .frame{background:var(--sharedbg); border:1px solid #b7e0c0; border-radius:10px; padding:6px 20px; margin:18px 0;}
+  .frame strong{color:var(--shared);}
+  .warn{background:var(--warnbg); border:1px solid #eacb6b; border-radius:10px; padding:6px 20px; margin:18px 0;}
+  .warn strong{color:var(--warn);}
+  .note{background:var(--nerbg); border:1px solid #9ec2f0; border-radius:10px; padding:6px 20px; margin:18px 0;}
+  .risk{background:var(--redbg); border:1px solid #f0a8a8; border-radius:10px; padding:6px 20px; margin:18px 0;}
+  .risk strong{color:var(--red);}
+  table{border-collapse:collapse; width:100%; margin:16px 0; font-size:14px;}
+  th,td{border:1px solid var(--line); padding:9px 12px; text-align:left; vertical-align:top;}
+  th{background:#f6f8fa; font-weight:600;}
+  th.unicol{background:var(--unibg); color:var(--uni);}
+  th.nercol{background:var(--nerbg); color:var(--ner);}
+  td.dim{font-weight:600; background:#fbfcfd; width:230px;}
+  .m{border-bottom:2px dotted #0969da;}
+  code{background:#f6f8fa; padding:1px 6px; border-radius:5px; font-size:13.5px;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;}
+  ul{margin:6px 0; padding-left:22px;}
+  li{margin:6px 0; font-size:14.5px;}
+  .opts{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin:22px 0;}
+  .opt{border:1px solid var(--line); border-radius:12px; padding:0 20px 16px;}
+  .opt.a{border-top:5px solid var(--uni);}
+  .opt.b{border-top:5px solid var(--ner);}
+  .opt h3{margin:16px 0 4px;}
+  .opt.a h3{color:var(--uni);}
+  .opt.b h3{color:var(--ner);}
+  .opt .tagline{color:var(--muted); font-size:14px; margin:0 0 8px;}
+  blockquote{margin:14px 0; padding:12px 16px; background:#fbfcfd; border-left:4px solid var(--line);
+    border-radius:6px; font-size:14.5px;}
+  @media(max-width:760px){.opts{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>PII Scrubber — GLiNER Result &amp; the Decision It Puts in Front of You</h1>
+<p class="sub">Follow-up to <em>Choosing the Detection Engine</em>. The middle option between plain NER and a local LLM has now been built and measured. This brief reports what was found and frames the one decision that remains.</p>
+<span class="badge">GLiNER FIGURES MEASURED · 16 AUG 2026</span>
+<span class="badge">LOCAL LLM (OPTION A) STILL UNBUILT — ESTIMATES ONLY</span>
+<span class="badge">NOTHING NEW DEPLOYED — LIVE SYSTEM UNCHANGED</span>
+
+<div class="frame">
+<p><strong>Where the previous brief left off.</strong> The deployed NER scrubber scores <strong>90.0% on a fresh blind test</strong>, and its residual is almost entirely <strong>personal names in prose</strong> — the one class pattern rules were measured unable to reach. The open question was whether that residual justified a local LLM. Since then, a third engine was trialled: <strong>GLiNER</strong>, a small local language model that detects names by meaning rather than by memorized patterns — the "middle rung" between plain NER and a full LLM. It was built, run, and measured under the same discipline as everything else in this project: pre-registered expectations, blind to nothing it was graded on, nothing deployed.</p>
+</div>
+
+<h2>What was found — the good half</h2>
+<p>Run in combination with the existing engine (each covers the other's blind spots), GLiNER <strong>closed every known miss on the project's internal test material — including every personal name</strong>: the all-caps surnames, the unusual names, the names in subject position that defeated every rule. It also caught the unnumbered street references ("the warehouse on Willis Street") that no pattern could. The two engines fail in almost perfectly different places: GLiNER reads names and misses structured values (IBANs, IPs, phone extensions); the deterministic rules do the exact opposite. Combined, nothing in the internal material leaked.</p>
+<div class="note">
+<p><strong>How to read that honestly.</strong> The internal test sets have been used throughout development, so "closed every known miss" means exactly that — the misses we knew about. It is <em>not</em> a product catch-rate. The honest final number would come from <strong>one fresh blind test</strong>, already prepared for and held in reserve, run once against the combined engine if it ships. Until then, <strong>90.0% blind remains the only quotable figure</strong>, and it describes the current engine, not the combination.</p>
+</div>
+<p>Practicalities also measured: the combined engine <strong>fits the current free-tier infrastructure</strong> (2.2 GB of the 3 GB memory ceiling, under stress), and it is <strong>roughly 100× slower per request</strong> — fine for the document-upload path (65 documents in ~48 seconds, and that path is not time-critical), unknown for the live-incident path until measured on the real pod, with a fallback already agreed: if too slow, the live path keeps the current engine.</p>
+
+<h2>What was found — the cost half, and why it can't be engineered away</h2>
+<p>GLiNER is confidently wrong about ordinary business language. It reads <em>"customer"</em>, <em>"plant 4000"</em>, <em>"warehouse team"</em>, <em>"service desk"</em> as people and organisations — often with <em>higher</em> confidence than it has on real names. Measured on 21 documents containing <strong>no PII at all</strong>:</p>
+<table>
+  <thead><tr><th>Engine</th><th>Clean documents damaged by wrong redaction</th></tr></thead>
+  <tbody>
+    <tr><td>Current engine (deployed today)</td><td><strong>2 of 21</strong> (9.5%)</td></tr>
+    <tr><td>Combined engine, after all fixes</td><td><strong>7 of 21</strong> (33%)</td></tr>
+  </tbody>
+</table>
+<blockquote>The sharpest example: a document reading <em>"No customer or personal data in this one"</em> came out as <em>"No <b>&lt;PERSON&gt;</b> or personal data in this one"</em> — the redaction inverting the sentence's meaning.</blockquote>
+<p><strong>Every engineering remedy was tried or measured before this brief was written</strong>, under pre-registered tests: a smarter suppression rule was designed, proved safe, and shipped internally (it repaired one document and, as a side benefit, found and fixed a small coverage bug that had been in the deployed scrubber all along); confidence thresholds were measured and ruled out (GLiNER is <em>confident</em> when wrong); restricting GLiNER's categories was derived and ruled out (it relocates the damage rather than removing it); and a vocabulary campaign was measured to a ceiling of 4-of-21 — still double today's rate, with each added word carrying a real risk of hiding a genuine name. <strong>The floor is roughly 7 of 21. This is a property of the engine, not a bug awaiting a fix.</strong></p>
+
+<h2>The shape of the decision</h2>
+<p>The two costs land on different paths, and the architecture already has an answer for one of them:</p>
+<ul>
+  <li><strong>Live-incident path:</strong> over-redaction costs nothing here by design — identifiers are re-mapped inside our boundary, and triage matches the <em>pattern and fix</em>, not the customer. The only open question on this path is speed, measurable only on the real pod, with the fallback already agreed.</li>
+  <li><strong>Upload path (the knowledge base):</strong> over-redaction damages readability — but this path has always had a <strong>human reviewer (BPA gate)</strong>, and a mechanism already identified in the architecture — a <strong>restore step</strong> that lets the reviewer un-redact wrongly caught jargon with one action per token — turns the damage from permanent corpus noise into a few seconds of reviewer work per affected document.</li>
+</ul>
+<div class="warn">
+<p><strong>So the real trade is human, not technical:</strong> the reviewer does a little more <em>restoring</em> on roughly a third of clean documents — work that is easy, visible, and impossible to get wrong silently — in exchange for the engine catching the personal names that are precisely what a tired reviewer is worst at spotting. A missed name slips through quietly; an over-redacted "plant 4000" is loud and fixable. Which direction of reviewer effort you prefer is the decision.</p>
+</div>
+
+<h2>The three options now on the table</h2>
+<div class="opts">
+  <div class="opt a">
+    <h3>1 — Ship the combined engine, with the restore step</h3>
+    <p class="tagline">One release: combined engine + reviewer-restore in the BPA flow. Live-path speed measured at deployment, with the agreed fallback.</p>
+    <ul>
+      <li>Closes the personal-name class — the entire known residual — on both paths (live path pending the speed gate).</li>
+      <li>Costs: build the restore step; more reviewer restore-work on the upload path; slower requests.</li>
+      <li>Finishes the project: one release, then the held blind test produces the final number.</li>
+      <li>Likely renders the local-LLM question moot at a fraction of its cost — pending the blind confirmation.</li>
+    </ul>
+  </div>
+  <div class="opt b">
+    <h3>2 — Stay with the current engine</h3>
+    <p class="tagline">The deployed scrubber is stable, measured, and complete on its own terms.</p>
+    <ul>
+      <li>Keeps 90.0% blind, clean corpus readability, fast responses, no new work.</li>
+      <li>The personal-name residual stands — caught by the human on the upload path, <strong>uncaught on the live path</strong>, where there is no human.</li>
+      <li>The local-LLM question returns in its original form: is that live residual acceptable, or does it justify Option A's cost?</li>
+    </ul>
+  </div>
+</div>
+<p><strong>3 — The local LLM (Option A)</strong> remains what it was in the previous brief: unbuilt, unmeasured here, higher cost and complexity. What has changed is its competitive position — the middle rung has now been measured catching every known name for a fraction of an LLM's cost and none of its operational burden. If option 1's blind test confirms the internal result, the case for Option A largely dissolves; if option 1 is declined, Option A is again the only route to the names.</p>
+
+<h2>What happens after the decision</h2>
+<table>
+  <thead><tr><th>If you choose</th><th>Then</th></tr></thead>
+  <tbody>
+    <tr><td class="dim">Option 1 — ship combined</td><td>One planned release (restore step + combined engine), deployed with the same gate discipline as every prior release; live-path speed measured at deployment with the presidio fallback pre-agreed; the held blind test runs once and produces the final, quotable catch-rate; keys rotated; project complete.</td></tr>
+    <tr><td class="dim">Option 2 — stay as-is</td><td>No further engineering. The blind test can optionally be spent confirming the current engine's number instead; keys rotated; project complete with the live-path residual documented as accepted.</td></tr>
+    <tr><td class="dim">Option 3 — pursue local LLM</td><td>A new project: build, measure, and gate an Option-A scrubber under the same discipline. Nothing measured here transfers except the test method and the corpora.</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+<p><strong>Evidence status, for the record.</strong> Every GLiNER figure above is measured, most under pre-registered expectations where the result was written down before the run. The internal-material result ("closed every known miss") is a development result, not a product claim; the blind test that would make it a product claim is prepared and unused. The current engine's 90.0% blind figure is unchanged. The local LLM remains estimated in both directions. Nothing described here has touched the live deployment, which runs the current engine unchanged.</p>
+</div>
+
+</div>
+</body>
+</html>
