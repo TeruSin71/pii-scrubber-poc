@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KB Upload Path — CPI → NER → BPA Integration Design</title>
+<style>
+  :root{
+    --bg:#ffffff; --fg:#1f2328; --muted:#57606a; --line:#d0d7de;
+    --accent:#1a73e8; --accentbg:#f6f8fa; --shared:#1a7f37; --sharedbg:#eef8f0;
+    --warn:#9a6700; --warnbg:#fff8e6; --red:#cf222e; --redbg:#fff1f0;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--fg);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:980px; margin:0 auto; padding:44px 26px 80px;}
+  h1{font-size:26px; line-height:1.25; margin:0 0 4px;}
+  .sub{color:var(--muted); margin:0 0 24px;}
+  h2{font-size:19px; margin:34px 0 10px; padding-bottom:6px; border-bottom:2px solid var(--line);}
+  p{margin:11px 0;}
+  code{background:var(--accentbg); padding:1px 6px; border-radius:5px; font-size:13.5px;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;}
+  table{border-collapse:collapse; width:100%; margin:14px 0; font-size:14px;}
+  th,td{border:1px solid var(--line); padding:8px 11px; text-align:left; vertical-align:top;}
+  th{background:var(--accentbg); font-weight:600;}
+  td.k{font-weight:600; background:#fbfcfd; width:190px;}
+  .frame{background:var(--sharedbg); border:1px solid #b7e0c0; border-radius:10px; padding:5px 18px; margin:16px 0;}
+  .frame strong{color:var(--shared);}
+  .warn{background:var(--warnbg); border:1px solid #eacb6b; border-radius:10px; padding:5px 18px; margin:16px 0;}
+  .warn strong{color:var(--warn);}
+  .risk{background:var(--redbg); border:1px solid #f0a8a8; border-radius:10px; padding:5px 18px; margin:16px 0;}
+  .risk strong{color:var(--red);}
+  ol,ul{margin:8px 0; padding-left:24px;}
+  li{margin:6px 0; font-size:14.5px;}
+  .flow{background:#fbfdfe; border:1px solid var(--line); border-radius:10px; padding:14px 18px; margin:14px 0;
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace; font-size:13.5px; line-height:1.9; overflow-x:auto;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>KB Upload Path — CPI → NER Scrubber → BPA</h1>
+<p class="sub">Integration design for the build path. Extends the existing JIRA→CPI connection; frontend screens in SAP Build Apps; approval and restore in SAP Build Process Automation. Engine-agnostic: identical whichever scrubber engine ships.</p>
+
+<h2>Flow</h2>
+<div class="flow">
+JIRA (closed ticket, KB-source label)<br>
+&nbsp;&nbsp;└─ existing CPI connection ── <b>[NEW] iFlow branch</b><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1. call NER scrubber&nbsp;&nbsp;POST /v1/scrub&nbsp;&nbsp;(AI Core, OAuth2, serial)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2. receive scrubbed text <b>+ token map</b><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3. persist { ticketId, raw, scrubbed, tokenMap } → HANA Cloud&nbsp;&nbsp;<i>(inside boundary)</i><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4. start BPA process with ticketId key<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└─ Build Apps review screen: original ⇄ scrubbed, <b>restore-per-token</b> from map<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└─ reviewer approves → entry is 100% clean<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5. [outbound — ONLY approved text] → variant classifier (Claude) → corpus
+</div>
+
+<div class="frame"><p><strong>Boundary invariant, stated as a hard rule:</strong> raw text and token maps exist only in CPI, HANA and BPA — all inside the tenant. The single outbound hop is step 5, and it carries exclusively human-approved text. No iFlow branch may ever call an external service before BPA approval.</p></div>
+
+<h2>What already exists vs what is new</h2>
+<table>
+  <tbody>
+    <tr><td class="k">Exists</td><td>JIRA→CPI connection · NER scrubber live on AI Core (<code>/v1/scrub</code>, 1.2.3) · BPA suite · architecture design</td></tr>
+    <tr><td class="k">New — scrubber</td><td><b>One small API release:</b> batch scrub returns the token map (placeholder → original) alongside scrubbed text. This is the long-standing open architecture item; the frontend cannot be built without it. Ships under the project's normal gate discipline.</td></tr>
+    <tr><td class="k">New — CPI</td><td>iFlow branch: scrub call, persistence, BPA trigger (details below)</td></tr>
+    <tr><td class="k">New — BPA / Build Apps</td><td>Approval process + review/restore screen; restore actions logged</td></tr>
+    <tr><td class="k">New — storage</td><td>HANA Cloud tables for staged entries + token maps + the approved corpus</td></tr>
+  </tbody>
+</table>
+
+<h2>CPI iFlow — configuration decisions (each grounded in a measurement)</h2>
+<table>
+  <thead><tr><th>Setting</th><th>Value</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td class="k">Credentials</td><td>OAuth2 Client Credentials artifact → AI Core token endpoint; <code>AI-Resource-Group</code> header on calls</td><td>CPI owns token lifecycle — ends manual token minting; single touchpoint when keys rotate at project completion</td></tr>
+    <tr><td class="k">Throughput</td><td><b>Strictly serial</b> — no parallel splitter toward the scrubber</td><td>Free tier = 1 pod; 4-way concurrency was <i>measured</i> at 0.51× — parallel calls make it slower, not faster</td></tr>
+    <tr><td class="k">Timeout</td><td>Receiver timeout ≥ 120 s per document</td><td>Current engine: ms. If the GLiNER union ships: ~1 s/doc measured upper bound — set once, survive the engine decision</td></tr>
+    <tr><td class="k">Retry</td><td>JMS/data-store queue, exponential backoff, dead-letter after N attempts, alert on DLQ</td><td>Cutovers are delete-then-create — the endpoint <i>disappears for minutes during every release</i>. Queue+retry makes cutovers lossless</td></tr>
+    <tr><td class="k">Identity check</td><td>Log <code>/v1/info</code> <code>build_version</code> once per run/batch</td><td>The project's own rule: identity is checked, not inferred — the log line ties every scrubbed batch to the engine version that produced it</td></tr>
+    <tr><td class="k">Payload</td><td>One document per message; <code>note</code>/metadata fields never sent to the scrubber</td><td>Metadata-as-payload is a named trap class in the scrubber project</td></tr>
+  </tbody>
+</table>
+
+<h2>BPA process + review screen</h2>
+<ol>
+  <li>Process input: <code>ticketId</code>. Screen loads raw + scrubbed + token map from HANA by key.</li>
+  <li>Reviewer sees original and scrubbed side by side; each placeholder is clickable → <b>restore</b> (from the map) or keep. Jargon false alarms ("plant ELEC", "Sls Org GGL") are one click each.</li>
+  <li>Reviewer may also redact <i>more</i> (the residual the engine missed) — this is the gap-to-100% job the gate exists for.</li>
+  <li>Approve → final text frozen; reject → back to queue with comment.</li>
+  <li><b>Log every restore action</b> (term, frequency). This log is the evidence feed the scrubber's allowlist rule requires — a term repeatedly restored by reviewers has earned per-entry protection consideration. Vocabulary grows from observed misfires, never from bulk loads.</li>
+</ol>
+
+<h2>Build order</h2>
+<table>
+  <thead><tr><th>Phase</th><th>Deliverable</th><th>Verified by</th></tr></thead>
+  <tbody>
+    <tr><td class="k">1 — Scrubber API</td><td>Token map in <code>/v1/scrub</code> batch response (small release, normal gates)</td><td>Existing release discipline; map round-trips a test document byte-perfectly</td></tr>
+    <tr><td class="k">2 — CPI + storage</td><td>iFlow branch scrubs and persists; no BPA yet</td><td>Test tickets land in HANA with correct scrubbed text + map; retry proven by scrubbing through a deliberate endpoint outage</td></tr>
+    <tr><td class="k">3 — BPA + screen</td><td>Approval flow with restore UI</td><td>Reviewer restores a planted jargon false-alarm and completes a planted miss on test tickets</td></tr>
+    <tr><td class="k">4 — Classifier + corpus</td><td>Post-approval outbound hop + corpus table</td><td>Boundary check: capture outbound traffic, confirm only approved text leaves</td></tr>
+  </tbody>
+</table>
+
+<div class="warn"><p><strong>Independent of the engine decision.</strong> Nothing here changes if management picks the current engine or the GLiNER union — only the timeout setting anticipates the slower engine. Phases 1–2 can start now against the live 1.2.3 scrubber.</p></div>
+
+<div class="risk"><p><strong>Two things this design must never do:</strong> call any external service with pre-approval text (the boundary rule), and let anything but the scrubber + BPA reviewer touch raw data. If a future requirement seems to need either, it goes back to design review, not into a CPI branch.</p></div>
+
+<h2>Open decisions (small, non-blocking)</h2>
+<ul>
+  <li>HANA Cloud vs CPI data store for staging — HANA recommended (the corpus needs a real store anyway; one persistence layer).</li>
+  <li>Expert-authoring entry point: same BPA process started from a Build Apps form (the architecture doc's option b) — decide when the review UI is built.</li>
+  <li>Retention: how long raw + token maps are kept after approval (compliance call — suggest deleting raw on approval, keeping only the clean corpus entry).</li>
+</ul>
+
+</div>
+</body>
+</html>

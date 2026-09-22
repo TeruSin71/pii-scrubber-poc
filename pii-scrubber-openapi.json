@@ -1,0 +1,126 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "PII Scrubber",
+    "description": "Local PII scrubber running on SAP AI Core. Redacts personal data before any text leaves the compliance boundary. mode=live returns numbered placeholders; mode=batch returns plain type placeholders.",
+    "version": "1.2.3"
+  },
+  "servers": [
+    {
+      "url": "https://api.ai.prod.ap-southeast-2.aws.ml.hana.ondemand.com/v2/inference/deployments/daedcfe9342d21a7",
+      "description": "AI Core inference endpoint - reached via the NER_SCRUBBER destination"
+    }
+  ],
+  "paths": {
+    "/v1/scrub": {
+      "post": {
+        "summary": "Scrub PII from text",
+        "description": "Detects and redacts personal data in the supplied text and returns the scrubbed version.",
+        "operationId": "scrubText",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScrubRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Scrubbed result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScrubResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/info": {
+      "get": {
+        "summary": "Engine identity and build version",
+        "description": "Returns which engine and build is answering. Used to prove which artifact produced a result.",
+        "operationId": "getInfo",
+        "responses": {
+          "200": {
+            "description": "Build and engine identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InfoResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ScrubRequest": {
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Raw text to scrub"
+          },
+          "mode": {
+            "type": "string",
+            "description": "live = numbered placeholders, batch = type placeholders",
+            "default": "live"
+          }
+        }
+      },
+      "ScrubResponse": {
+        "type": "object",
+        "properties": {
+          "scrubbed_text": {
+            "type": "string",
+            "description": "The text with personal data replaced by placeholders"
+          },
+          "redacted_count": {
+            "type": "integer",
+            "description": "How many values were redacted"
+          },
+          "engine": {
+            "type": "string",
+            "description": "Detection engine that produced this result"
+          },
+          "mode": {
+            "type": "string",
+            "description": "Mode the scrub ran in"
+          }
+        }
+      },
+      "InfoResponse": {
+        "type": "object",
+        "properties": {
+          "build_version": {
+            "type": "string"
+          },
+          "git_sha": {
+            "type": "string"
+          },
+          "engine": {
+            "type": "string"
+          },
+          "presidio_loaded": {
+            "type": "boolean"
+          },
+          "gliner_loaded": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}
